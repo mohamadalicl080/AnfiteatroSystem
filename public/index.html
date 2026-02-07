@@ -762,7 +762,8 @@
                 </div>
             </div>
 
-            <form class="p-6 space-y-4">
+            <form class="p-6 space-y-4" id="movementForm">
+
                 
                 <!-- Fecha -->
                 <div>
@@ -1051,7 +1052,7 @@
                         <i class="fas fa-times mr-2"></i>Cancelar
                     </button>
                     <button type="submit" 
-                            onclick="saveMovement(event)"
+                            
                             class="flex-1 px-6 py-3 gradient-bg text-white rounded-lg font-semibold hover:shadow-lg transition duration-200">
                         <i class="fas fa-save mr-2"></i>Guardar Movimiento
                     </button>
@@ -1145,57 +1146,58 @@ async function saveMovement(event) {
   event.preventDefault();
 
   try {
-    // 1) Lee campos del formulario (ajusta IDs si los tuyos cambian)
-    const fecha = document.querySelector('#movementDate')?.value
-      || document.querySelector('input[type="date"]')?.value
-      || "";
+    const modal = document.getElementById("newMovementModal");
+    if (!modal) throw new Error("No encuentro el modal newMovementModal");
 
-    const area = document.querySelector('#movementArea')?.value
-      || document.querySelector('select')?.value
-      || "";
+    const form = modal.querySelector("#movementForm") || modal.querySelector("form") || modal;
 
-    const tipo = document.querySelector('input[name="movementType"]:checked')?.value
-      || "Ingreso";
+    // OJO: lee SIEMPRE dentro del modal (para no tomar filtros de arriba)
+    const fecha = form.querySelector('input[type="date"]')?.value?.trim() || "";
+    const areaRaw = form.querySelector('select[required]')?.value?.trim() || "";
+    const tipoRaw = form.querySelector('input[name="tipo"]:checked')?.value?.trim() || "";
+    const descripcion = form.querySelector('textarea[required]')?.value?.trim() || "";
+    const monto = Number(form.querySelector('input[type="number"]')?.value || 0) || 0;
+    const periodo = form.querySelector('input[type="month"]')?.value?.trim() || "";
 
-    const descripcion = document.querySelector('#movementDesc')?.value
-      || document.querySelector('textarea')?.value
-      || "";
+    // Convierte tus values (slugs) a los nombres de Sheet
+    const AREA_MAP = {
+      "gastos-comunes": "Gastos Comunes",
+      "arriendos": "Arriendos",
+      "proveedores": "Proveedores",
+      "empleados": "Empleados",
+      "caja-chica": "Caja Chica",
+      "otros": "Otros"
+    };
+    const area = AREA_MAP[areaRaw] || areaRaw;
 
-    const monto = Number(
-      document.querySelector('#movementAmount')?.value
-      || document.querySelector('input[type="number"]')?.value
-      || 0
-    );
+    // Normaliza tipo
+    const tipo = (tipoRaw === "ingreso" ? "Ingreso" : tipoRaw === "egreso" ? "Egreso" : tipoRaw);
 
-    const periodo = document.querySelector('#movementPeriod')?.value
-      || document.querySelector('input[type="month"]')?.value
-      || "";
-
-    // opcionales (si existen en tu UI)
-    const metodoPago = document.querySelector('#metodoPago')?.value || "";
-    const estadoPago = document.querySelector('#estadoPago')?.value || "";
+    // Validación antes de enviar
+    if (!fecha || !area || !tipo || !descripcion) {
+      throw new Error(`Faltan campos requeridos (fecha, area, tipo, descripcion).
+fecha="${fecha}" area="${area}" tipo="${tipo}" descripcion="${descripcion}"`);
+    }
 
     const payload = {
       fecha,
       area,
-      tipo: (tipo === "ingreso" ? "Ingreso" : tipo === "egreso" ? "Egreso" : tipo),
+      tipo,
       descripcion,
       monto,
-      responsable: "Admin",
-      periodo,
-      metodoPago,
-      estadoPago
+      responsable: currentUser?.name || "Admin",
+      periodo
     };
 
-    // 2) POST real a Sheets
+    console.log("PAYLOAD =>", payload);
+
+    // POST real a Sheets
     const result = await apiFetch("/.netlify/functions/movimientos", {
       method: "POST",
       body: JSON.stringify(payload)
     });
 
-    // 3) Tu alerta de éxito (la misma que ya usas)
-    const modal = document.getElementById('newMovementModal');
-
+    // alerta de éxito (tu misma UI)
     const successAlert = document.createElement('div');
     successAlert.className = 'fixed top-4 right-4 bg-green-500 text-white px-6 py-4 rounded-lg shadow-lg flex items-center z-50';
     successAlert.innerHTML = `
@@ -1208,12 +1210,10 @@ async function saveMovement(event) {
     `;
     document.body.appendChild(successAlert);
 
-    // cerrar modal
-    modal?.classList.add('hidden');
-
+    modal.classList.add('hidden');
     setTimeout(() => successAlert.remove(), 4000);
 
-    // (opcional) refrescar tabla si tienes una función para cargar movimientos
+    // opcional: refrescar tabla si tienes función
     if (typeof loadMovimientos === "function") await loadMovimientos();
 
   } catch (err) {
@@ -1221,6 +1221,11 @@ async function saveMovement(event) {
     console.error(err);
   }
 }
+
+document.addEventListener("DOMContentLoaded", () => {
+  const form = document.getElementById("movementForm");
+  if (form) form.addEventListener("submit", saveMovement);
+});
 
 
         // Cerrar modal al hacer click fuera
