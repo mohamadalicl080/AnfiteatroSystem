@@ -1238,6 +1238,37 @@ function formatFechaISO(iso) {
   return `${m[3]}/${m[2]}/${m[1]}`;
 }
 
+
+function norm(s) {
+  return (s ?? "")
+    .toString()
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+function findCol(header, candidates) {
+  const h = header.map(norm);
+  for (const c of candidates) {
+    const i = h.indexOf(norm(c));
+    if (i >= 0) return i;
+  }
+  return -1;
+}
+
+function parseMoney(v) {
+  if (v == null) return 0;
+  const s = v.toString().trim();
+  const cleaned = s.replace(/[^\d-]/g, ""); // deja dígitos y -
+  const n = Number(cleaned);
+  return Number.isFinite(n) ? n : 0;
+}
+
+
+
+
+
 async function loadMovimientos() {
   const tbody = document.getElementById("movimientosBody");
   if (!tbody) return;
@@ -1248,15 +1279,19 @@ async function loadMovimientos() {
 
   // índices según tu backend (por tus capturas anteriores)
   // Header típico: ["ID","Fecha","Área","Tipo","Descripción","Monto","Responsable","Periodo","MetodoPago","EstadoPago","CreatedAt"]
-  const idx = {
-    id: header.indexOf("ID"),
-    fecha: header.indexOf("Fecha"),
-    area: header.indexOf("Área"),
-    tipo: header.indexOf("Tipo"),
-    descripcion: header.indexOf("Descripción"),
-    monto: header.indexOf("Monto"),
-    responsable: header.indexOf("Responsable"),
-  };
+ const idx = {
+  id: findCol(header, ["ID"]),
+  fecha: findCol(header, ["Fecha"]),
+  area: findCol(header, ["Área", "Area"]),
+  tipo: findCol(header, ["Tipo"]),
+  descripcion: findCol(header, ["Descripción", "Descripcion"]),
+  // 👇 IMPORTANTE: tu sheet/back puede tener "Monto" o "MontoAsignado"
+  monto: findCol(header, ["Monto", "MontoAsignado", "Monto Asignado"]),
+  responsable: findCol(header, ["Responsable"]),
+};
+
+console.log("HEADER =>", header);
+console.log("IDX =>", idx);
 
   // limpia tabla y renderiza últimos 20 (más recientes al principio)
   tbody.innerHTML = "";
@@ -1268,7 +1303,8 @@ async function loadMovimientos() {
     const area = idx.area >= 0 ? r[idx.area] : "";
     const tipo = idx.tipo >= 0 ? r[idx.tipo] : "";
     const descripcion = idx.descripcion >= 0 ? r[idx.descripcion] : "";
-    const monto = idx.monto >= 0 ? r[idx.monto] : 0;
+    const monto = idx.monto >= 0 ? parseMoney(r[idx.monto]) : 0;
+
     const responsable = idx.responsable >= 0 ? r[idx.responsable] : "";
 
     const tr = document.createElement("tr");
