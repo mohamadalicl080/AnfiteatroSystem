@@ -1,0 +1,9 @@
+{
+  "name": "anfiteatro-netlify-sheets-backend",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Netlify Functions backend that uses Google Sheets as a database.",
+  "dependencies": {
+    "googleapis": "^146.0.0"
+  }
+}
