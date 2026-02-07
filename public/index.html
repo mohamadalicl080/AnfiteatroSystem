@@ -1305,13 +1305,18 @@ function calcStatsFromMovs(header, rows) {
     const fecha = iFecha >= 0 ? (r[iFecha] || "") : "";
     const tipo  = iTipo  >= 0 ? (r[iTipo]  || "") : "";
     const area  = iArea  >= 0 ? (r[iArea]  || "") : "";
+
+    const tipoN = norm(tipo);
+const areaN = norm(area);
+
     const estadoPago = iEstadoPago >= 0 ? (r[iEstadoPago] || "") : "";
 
     const montoRaw = iMonto >= 0 ? r[iMonto] : 0;
     const monto = parseMoney(montoRaw);
 
-    const isIngreso = tipo === "Ingreso" || monto > 0;
-    const isEgreso  = tipo === "Egreso"  || monto < 0;
+    const isIngreso = (tipoN === "ingreso") || (tipoN === "" && monto > 0);
+const isEgreso  = (tipoN === "egreso")  || (tipoN === "" && monto < 0);
+
 
     // Total histórico
     if (isIngreso) ingresosTotal += Math.abs(monto);
@@ -1330,7 +1335,9 @@ function calcStatsFromMovs(header, rows) {
     }
 
     // Caja chica (si el área existe)
-    if (area === "Caja Chica") {
+    const isCajaChica = areaN === "caja chica" || areaN === "caja-chica" || areaN === "cajachica";
+if (isCajaChica) {
+
       if (isIngreso) cajaChica += Math.abs(monto);
       if (isEgreso)  cajaChica -= Math.abs(monto);
     }
@@ -1371,7 +1378,7 @@ async function loadMovimientos() {
   const data = await apiFetch("/.netlify/functions/movimientos");
   const header = data.header || [];
   const rows = data.rows || [];
-  
+
 updateCards(header, rows);
 
   // índices según tu backend (por tus capturas anteriores)
