@@ -365,14 +365,14 @@
             area: findCol(header, ["Área", "Area"]),
             tipo: findCol(header, ["Tipo"]),
             descripcion: findCol(header, ["Descripción", "Descripcion"]),
-            monto: findCol(header, ["Monto", "MontoAsignado", "Monto Asignado", "Monto_Signado", "Monto Signado"]),
+            monto: findCol(header, ["Monto", "MontoAsignado", "Monto Asignado", "Monto_Signado", "Monto Signado", "Monto_Asignado", "Monto Asignado"]),
             responsable: findCol(header, ["Responsable"]),
             periodo: findCol(header, ["Periodo", "Período"]),
           };
         }
 
         function calcStatsFromMovs(header, rows) {
-          const iMonto = findCol(header, ["MontoAsignado","Monto Asignado","Monto","Monto_Signado","Monto Signado"]);
+          const iMonto = findCol(header, ["MontoAsignado","Monto Asignado","Monto","Monto_Signado","Monto Signado","Monto_Asignado"]);
           const iTipo  = findCol(header, ["Tipo"]);
           const iFecha = findCol(header, ["Fecha"]);
           const iEstadoPago = findCol(header, ["EstadoPago","Estado Pago"]);
@@ -459,11 +459,16 @@
           event.preventDefault();
           try {
             const payload = readModalFields();
+
             if (EDITING_ID) {
-              const result = await apiFetch(`/.netlify/functions/movimientos?id=${encodeURIComponent(EDITING_ID)}`, {
+              // ✅ FIX IMPORTANTE: tu función Netlify PUT espera payload.id en el BODY
+              payload.id = EDITING_ID;
+
+              const result = await apiFetch(`/.netlify/functions/movimientos`, {
                 method: "PUT",
                 body: JSON.stringify(payload)
               });
+
               alert(`✅ Movimiento editado!\nID: ${result.id || EDITING_ID}`);
             } else {
               const result = await apiFetch("/.netlify/functions/movimientos", {
@@ -472,6 +477,7 @@
               });
               alert(`✅ Movimiento guardado!\nID: ${result.id}`);
             }
+
             closeModal();
             await loadMovimientos();
           } catch (err) {
@@ -573,6 +579,8 @@
           };
           document.getElementById("mvArea").value = AREA_REV[area] || "";
 
+          document.getElementById("mvTipoIngreso").checked = false;
+          document.getElementById("mvTipoEgreso").checked = false;
           if (tipo === "Ingreso") document.getElementById("mvTipoIngreso").checked = true;
           if (tipo === "Egreso") document.getElementById("mvTipoEgreso").checked = true;
 
