@@ -112,16 +112,16 @@
 
         <div class="bg-white rounded-t-xl shadow-sm border-b">
             <div class="flex space-x-8 px-6 overflow-x-auto">
-                <button class="py-4 tab-active whitespace-nowrap" onclick="showTab('movimientos')"><i class="fas fa-exchange-alt mr-2"></i>Movimientos</button>
-                <button class="py-4 text-gray-600 hover:text-purple-600 whitespace-nowrap" onclick="showTab('gastos')"><i class="fas fa-receipt mr-2"></i>Gastos Comunes</button>
-                <button class="py-4 text-gray-600 hover:text-purple-600 whitespace-nowrap" onclick="showTab('arriendos')"><i class="fas fa-home mr-2"></i>Arriendos</button>
-                <button class="py-4 text-gray-600 hover:text-purple-600 whitespace-nowrap" onclick="showTab('proveedores')"><i class="fas fa-tools mr-2"></i>Proveedores</button>
-                <button class="py-4 text-gray-600 hover:text-purple-600 whitespace-nowrap" onclick="showTab('empleados')"><i class="fas fa-users mr-2"></i>Empleados</button>
-                <button class="py-4 text-gray-600 hover:text-purple-600 whitespace-nowrap" onclick="showTab('caja-chica')"><i class="fas fa-wallet mr-2"></i>Caja Chica</button>
-                <button class="py-4 text-gray-600 hover:text-purple-600 whitespace-nowrap" onclick="showTab('otros')"><i class="fas fa-folder mr-2"></i>Otros</button>
-                <button class="py-4 text-gray-600 hover:text-purple-600 whitespace-nowrap" onclick="showTab('alertas')"><i class="fas fa-bell mr-2"></i>Alertas <span class="ml-1 bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">3</span></button>
-                <button class="py-4 text-gray-600 hover:text-purple-600 whitespace-nowrap" onclick="showTab('resumen')"><i class="fas fa-chart-pie mr-2"></i>Resumen Mensual</button>
-                <button class="py-4 text-gray-600 hover:text-purple-600 whitespace-nowrap" onclick="showTab('actividad')"><i class="fas fa-history mr-2"></i>Registro Actividad <span class="ml-1 bg-purple-500 text-white text-xs px-2 py-0.5 rounded-full">Admin</span></button>
+                <button class="py-4 tab-active whitespace-nowrap" onclick=\"showTab('movimientos', event)\"><i class="fas fa-exchange-alt mr-2"></i>Movimientos</button>
+                <button class="py-4 text-gray-600 hover:text-purple-600 whitespace-nowrap" onclick=\"showTab('gastos', event)\"><i class="fas fa-receipt mr-2"></i>Gastos Comunes</button>
+                <button class="py-4 text-gray-600 hover:text-purple-600 whitespace-nowrap" onclick=\"showTab('arriendos', event)\"><i class="fas fa-home mr-2"></i>Arriendos</button>
+                <button class="py-4 text-gray-600 hover:text-purple-600 whitespace-nowrap" onclick=\"showTab('proveedores', event)\"><i class="fas fa-tools mr-2"></i>Proveedores</button>
+                <button class="py-4 text-gray-600 hover:text-purple-600 whitespace-nowrap" onclick=\"showTab('empleados', event)\"><i class="fas fa-users mr-2"></i>Empleados</button>
+                <button class="py-4 text-gray-600 hover:text-purple-600 whitespace-nowrap" onclick=\"showTab('caja-chica', event)\"><i class="fas fa-wallet mr-2"></i>Caja Chica</button>
+                <button class="py-4 text-gray-600 hover:text-purple-600 whitespace-nowrap" onclick=\"showTab('otros', event)\"><i class="fas fa-folder mr-2"></i>Otros</button>
+                <button class="py-4 text-gray-600 hover:text-purple-600 whitespace-nowrap" onclick=\"showTab('alertas', event)\"><i class="fas fa-bell mr-2"></i>Alertas <span class="ml-1 bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">3</span></button>
+                <button class="py-4 text-gray-600 hover:text-purple-600 whitespace-nowrap" onclick=\"showTab('resumen', event)\"><i class="fas fa-chart-pie mr-2"></i>Resumen Mensual</button>
+                <button class="py-4 text-gray-600 hover:text-purple-600 whitespace-nowrap" onclick=\"showTab('actividad', event)\"><i class="fas fa-history mr-2"></i>Registro Actividad <span class="ml-1 bg-purple-500 text-white text-xs px-2 py-0.5 rounded-full">Admin</span></button>
             </div>
         </div>
 
@@ -195,11 +195,209 @@
         </div>
     </div>
 
-    <div id="actividad-tab" class="hidden bg-white rounded-b-xl shadow-lg p-6">
-        <div class="p-4 bg-gray-50 rounded-lg text-sm text-gray-600">Demo.</div>
+    
+    <div id="gastos-tab" class="hidden bg-white rounded-b-xl shadow-lg p-6">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-2xl font-bold text-gray-800"><i class="fas fa-receipt mr-2 text-purple-600"></i>Gastos Comunes</h2>
+        <div class="text-sm text-gray-600">Movimientos: <span id="gastosCount" class="font-semibold">0</span> · Total: <span id="gastosTotal" class="font-semibold">$0</span></div>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+          <thead class="bg-gray-100">
+            <tr>
+              <th class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Fecha</th>
+              <th class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Tipo</th>
+              <th class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Descripción</th>
+              <th class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Monto</th>
+              <th class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Responsable</th>
+              <th class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="gastosBody" class="bg-white divide-y divide-gray-200"></tbody>
+        </table>
+      </div>
     </div>
 
-    <div id="newMovementModal" class="hidden fixed inset-0 bg-black bg-opacity-50 modal-overlay flex items-center justify-center z-50">
+    <div id="arriendos-tab" class="hidden bg-white rounded-b-xl shadow-lg p-6">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-2xl font-bold text-gray-800"><i class="fas fa-home mr-2 text-purple-600"></i>Arriendos</h2>
+        <div class="text-sm text-gray-600">Movimientos: <span id="arriendosCount" class="font-semibold">0</span> · Total: <span id="arriendosTotal" class="font-semibold">$0</span></div>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+          <thead class="bg-gray-100">
+            <tr>
+              <th class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Fecha</th>
+              <th class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Tipo</th>
+              <th class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Descripción</th>
+              <th class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Monto</th>
+              <th class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Responsable</th>
+              <th class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="arriendosBody" class="bg-white divide-y divide-gray-200"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="proveedores-tab" class="hidden bg-white rounded-b-xl shadow-lg p-6">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-2xl font-bold text-gray-800"><i class="fas fa-tools mr-2 text-purple-600"></i>Proveedores</h2>
+        <div class="text-sm text-gray-600">Movimientos: <span id="proveedoresCount" class="font-semibold">0</span> · Total: <span id="proveedoresTotal" class="font-semibold">$0</span></div>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+          <thead class="bg-gray-100">
+            <tr>
+              <th class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Fecha</th>
+              <th class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Tipo</th>
+              <th class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Descripción</th>
+              <th class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Monto</th>
+              <th class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Responsable</th>
+              <th class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="proveedoresBody" class="bg-white divide-y divide-gray-200"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="empleados-tab" class="hidden bg-white rounded-b-xl shadow-lg p-6">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-2xl font-bold text-gray-800"><i class="fas fa-users mr-2 text-purple-600"></i>Empleados</h2>
+        <div class="text-sm text-gray-600">Movimientos: <span id="empleadosCount" class="font-semibold">0</span> · Total: <span id="empleadosTotal" class="font-semibold">$0</span></div>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+          <thead class="bg-gray-100">
+            <tr>
+              <th class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Fecha</th>
+              <th class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Tipo</th>
+              <th class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Descripción</th>
+              <th class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Monto</th>
+              <th class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Responsable</th>
+              <th class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="empleadosBody" class="bg-white divide-y divide-gray-200"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="caja-chica-tab" class="hidden bg-white rounded-b-xl shadow-lg p-6">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-2xl font-bold text-gray-800"><i class="fas fa-wallet mr-2 text-purple-600"></i>Caja Chica</h2>
+        <div class="text-sm text-gray-600">Movimientos: <span id="cajaChicaCount" class="font-semibold">0</span> · Neto: <span id="cajaChicaTotal" class="font-semibold">$0</span></div>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+          <thead class="bg-gray-100">
+            <tr>
+              <th class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Fecha</th>
+              <th class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Tipo</th>
+              <th class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Descripción</th>
+              <th class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Monto</th>
+              <th class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Responsable</th>
+              <th class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="cajaChicaBody" class="bg-white divide-y divide-gray-200"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="otros-tab" class="hidden bg-white rounded-b-xl shadow-lg p-6">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-2xl font-bold text-gray-800"><i class="fas fa-folder mr-2 text-purple-600"></i>Otros</h2>
+        <div class="text-sm text-gray-600">Movimientos: <span id="otrosCount" class="font-semibold">0</span> · Total: <span id="otrosTotal" class="font-semibold">$0</span></div>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+          <thead class="bg-gray-100">
+            <tr>
+              <th class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Fecha</th>
+              <th class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Tipo</th>
+              <th class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Descripción</th>
+              <th class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Monto</th>
+              <th class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Responsable</th>
+              <th class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="otrosBody" class="bg-white divide-y divide-gray-200"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="alertas-tab" class="hidden bg-white rounded-b-xl shadow-lg p-6">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-2xl font-bold text-gray-800"><i class="fas fa-bell mr-2 text-purple-600"></i>Alertas</h2>
+        <div class="text-sm text-gray-600">Activas: <span id="alertasCount" class="font-semibold">0</span></div>
+      </div>
+      <div id="alertasList" class="space-y-3"></div>
+      <p class="text-xs text-gray-400 mt-4">*Las alertas se generan desde Movimientos (morosos/pendientes y egresos altos).</p>
+    </div>
+
+    <div id="resumen-tab" class="hidden bg-white rounded-b-xl shadow-lg p-6">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-2xl font-bold text-gray-800"><i class="fas fa-chart-pie mr-2 text-purple-600"></i>Resumen Mensual</h2>
+        <div class="text-sm text-gray-600">Mes: <span id="resumenMes" class="font-semibold">—</span></div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div class="p-4 rounded-lg bg-gray-50 border">
+          <div class="text-xs text-gray-500">Ingresos (mes)</div>
+          <div id="resumenIngresosMes" class="text-xl font-semibold">$0</div>
+        </div>
+        <div class="p-4 rounded-lg bg-gray-50 border">
+          <div class="text-xs text-gray-500">Egresos (mes)</div>
+          <div id="resumenEgresosMes" class="text-xl font-semibold">$0</div>
+        </div>
+        <div class="p-4 rounded-lg bg-gray-50 border">
+          <div class="text-xs text-gray-500">Balance (mes)</div>
+          <div id="resumenBalanceMes" class="text-xl font-semibold">$0</div>
+        </div>
+      </div>
+
+      <h3 class="font-semibold text-gray-700 mb-2">Top áreas (mes)</h3>
+      <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+          <thead class="bg-gray-100">
+            <tr>
+              <th class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Área</th>
+              <th class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Ingresos</th>
+              <th class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Egresos</th>
+              <th class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Neto</th>
+            </tr>
+          </thead>
+          <tbody id="resumenTopAreas" class="bg-white divide-y divide-gray-200"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="actividad-tab" class="hidden bg-white rounded-b-xl shadow-lg p-6">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-2xl font-bold text-gray-800"><i class="fas fa-history mr-2 text-purple-600"></i>Registro Actividad</h2>
+        <div class="text-sm text-gray-600">Solo Admin · Últimas acciones</div>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+          <thead class="bg-gray-100">
+            <tr>
+              <th class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Fecha/Hora</th>
+              <th class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Usuario</th>
+              <th class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Acción</th>
+              <th class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Detalle</th>
+            </tr>
+          </thead>
+          <tbody id="actividadBody" class="bg-white divide-y divide-gray-200"></tbody>
+        </table>
+      </div>
+      <p class="text-xs text-gray-400 mt-4">*En esta demo se registra en memoria (se reinicia al recargar).</p>
+    </div>
+
+
+<div id="newMovementModal" class="hidden fixed inset-0 bg-black bg-opacity-50 modal-overlay flex items-center justify-center z-50">
         <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
             <div class="gradient-bg text-white p-6 rounded-t-2xl">
                 <div class="flex justify-between items-center">
@@ -292,33 +490,114 @@
         const MOV = { header: [], rows: [], idx: null };
         let EDITING_ID = null;
 
-        function showTab(tabName) {
-            document.getElementById('movimientos-tab').classList.add('hidden');
-            const actividadTab = document.getElementById('actividad-tab');
-            if (actividadTab) actividadTab.classList.add('hidden');
+        
+        // ===========================
+        // Tabs + Actividad (log local)
+        // ===========================
+        const TAB_MAP = {
+          "movimientos": "movimientos-tab",
+          "gastos": "gastos-tab",
+          "arriendos": "arriendos-tab",
+          "proveedores": "proveedores-tab",
+          "empleados": "empleados-tab",
+          "caja-chica": "caja-chica-tab",
+          "otros": "otros-tab",
+          "alertas": "alertas-tab",
+          "resumen": "resumen-tab",
+          "actividad": "actividad-tab",
+        };
 
-            if (tabName === 'movimientos') {
-                document.getElementById('movimientos-tab').classList.remove('hidden');
-            } else if (tabName === 'actividad') {
-                if (currentUser.role === 'admin') actividadTab.classList.remove('hidden');
-                else alert('⛔ Solo el Administrador puede acceder al Registro de Actividad');
-            } else {
-                alert(`Vista de "${tabName}" - Disponible en la versión completa`);
-            }
+        let CURRENT_TAB = "movimientos";
+        const ACT_LOG = []; // {ts,user,action,detail}
 
-            document.querySelectorAll('.py-4').forEach(tab => {
-                tab.classList.remove('tab-active');
-                tab.classList.add('text-gray-600');
-            });
-            event.target.closest('button').classList.add('tab-active');
-            event.target.closest('button').classList.remove('text-gray-600');
+        function logAction(action, detail) {
+          const ts = new Date().toISOString();
+          ACT_LOG.unshift({
+            ts,
+            user: currentUser?.name || "Admin",
+            action,
+            detail: detail || ""
+          });
+          // limita
+          if (ACT_LOG.length > 200) ACT_LOG.length = 200;
+          renderActividad();
         }
+
+        function renderActividad() {
+          const tbody = document.getElementById("actividadBody");
+          if (!tbody) return;
+          tbody.innerHTML = "";
+          (ACT_LOG || []).slice(0, 50).forEach(a => {
+            const tr = document.createElement("tr");
+            tr.className = "hover:bg-gray-50 transition duration-150";
+            const dt = a.ts ? new Date(a.ts) : null;
+            const when = dt && !isNaN(dt) ? dt.toLocaleString("es-CL") : (a.ts || "");
+            tr.innerHTML = `
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${when}</td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">${a.user || ""}</td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold text-purple-700">${a.action || ""}</td>
+              <td class="px-6 py-4 text-sm text-gray-900">${a.detail || ""}</td>
+            `;
+            tbody.appendChild(tr);
+          });
+        }
+
+        function showTab(tabName, ev) {
+          CURRENT_TAB = tabName;
+
+          // Ocultar todas
+          Object.values(TAB_MAP).forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.classList.add("hidden");
+          });
+
+          // Mostrar seleccionada
+          const targetId = TAB_MAP[tabName] || "movimientos-tab";
+          const targetEl = document.getElementById(targetId);
+          if (targetEl) targetEl.classList.remove("hidden");
+
+          // Registro Actividad: permiso admin
+          if (tabName === "actividad" && currentUser.role !== "admin") {
+            alert("⛔ Solo el Administrador puede acceder al Registro de Actividad");
+            CURRENT_TAB = "movimientos";
+            document.getElementById("movimientos-tab")?.classList.remove("hidden");
+            document.getElementById("actividad-tab")?.classList.add("hidden");
+            return;
+          }
+
+          // Estilos tabs activos
+          if (ev && ev.target) {
+            document.querySelectorAll('.py-4').forEach(tab => {
+              tab.classList.remove('tab-active');
+              tab.classList.add('text-gray-600');
+            });
+            const btn = ev.target.closest('button');
+            if (btn) {
+              btn.classList.add('tab-active');
+              btn.classList.remove('text-gray-600');
+            }
+          }
+
+          // Render extra según pestaña
+          if (tabName === "alertas") renderAlertas();
+          if (tabName === "resumen") renderResumenMensual();
+          if (tabName === "actividad") renderActividad();
+        }
+
 
         function openNewMovementModal() {
             EDITING_ID = null;
             document.getElementById('modalTitle').textContent = 'Nuevo Movimiento';
             document.getElementById('modalSubmitText').textContent = 'Guardar Movimiento';
             document.getElementById('movementForm')?.reset();
+            // set defaults (hoy / mes actual)
+            const d = new Date();
+            const iso = d.toISOString().slice(0,10);
+            const ym = iso.slice(0,7);
+            const fEl = document.getElementById('mvFecha');
+            if (fEl) fEl.value = iso;
+            const pEl = document.getElementById('mvPeriodo');
+            if (pEl) pEl.value = ym;
             document.getElementById('newMovementModal').classList.remove('hidden');
         }
         function closeModal() { document.getElementById('newMovementModal').classList.add('hidden'); }
@@ -470,12 +749,14 @@
               });
 
               alert(`✅ Movimiento editado!\nID: ${result.id || EDITING_ID}`);
+              logAction("Editar", `${payload.area} · ${payload.tipo} · ${formatCLP(payload.monto)} · ${payload.descripcion}`);
             } else {
               const result = await apiFetch("/.netlify/functions/movimientos", {
                 method: "POST",
                 body: JSON.stringify(payload)
               });
               alert(`✅ Movimiento guardado!\nID: ${result.id}`);
+              logAction("Crear", `${payload.area} · ${payload.tipo} · ${formatCLP(payload.monto)} · ${payload.descripcion}`);
             }
 
             closeModal();
@@ -550,6 +831,264 @@
           });
         }
 
+        // ===========================
+        // Render por pestañas (áreas, alertas, resumen)
+        // ===========================
+        function signedAmount(tipo, monto) {
+          const t = (tipo || "").toString().trim();
+          const m = Math.abs(Number(monto) || 0);
+          if (t === "Egreso") return -m;
+          if (t === "Ingreso") return m;
+          // fallback: si viene negativo ya firmado
+          return Number(monto) || 0;
+        }
+
+        function filterRowsByArea(areaName) {
+          if (!MOV.idx || MOV.idx.area < 0) return [];
+          return (MOV.rows || []).filter(r => (r[MOV.idx.area] || "") === areaName);
+        }
+
+        function calcCountAndTotal(rows) {
+          let total = 0;
+          for (const r of (rows || [])) {
+            const tipo = MOV.idx?.tipo >= 0 ? (r[MOV.idx.tipo] || "") : "";
+            const monto = MOV.idx?.monto >= 0 ? parseMoney(r[MOV.idx.monto]) : 0;
+            total += signedAmount(tipo, monto);
+          }
+          return { count: (rows || []).length, total };
+        }
+
+        function renderMovRowsInto(tbodyId, rows, opts = {}) {
+          const tbody = document.getElementById(tbodyId);
+          if (!tbody) return;
+          tbody.innerHTML = "";
+
+          const lastRows = (rows || []).slice().reverse().slice(0, 20);
+
+          lastRows.forEach(r => {
+            const id = MOV.idx.id >= 0 ? (r[MOV.idx.id] || "") : "";
+            const fecha = MOV.idx.fecha >= 0 ? (r[MOV.idx.fecha] || "") : "";
+            const area = MOV.idx.area >= 0 ? (r[MOV.idx.area] || "") : "";
+            const tipo = MOV.idx.tipo >= 0 ? (r[MOV.idx.tipo] || "") : "";
+            const descripcion = MOV.idx.descripcion >= 0 ? (r[MOV.idx.descripcion] || "") : "";
+            const monto = MOV.idx.monto >= 0 ? parseMoney(r[MOV.idx.monto]) : 0;
+            const responsable = MOV.idx.responsable >= 0 ? (r[MOV.idx.responsable] || "") : "";
+
+            const tipoBadge =
+              tipo === "Ingreso"
+                ? `<span class="px-3 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800"><i class="fas fa-arrow-up mr-1"></i>Ingreso</span>`
+                : `<span class="px-3 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800"><i class="fas fa-arrow-down mr-1"></i>Egreso</span>`;
+
+            const tr = document.createElement("tr");
+            tr.className = "hover:bg-gray-50 transition duration-150";
+
+            // Columnas: si opts.showArea => muestra área; si no, no.
+            tr.innerHTML = opts.showArea
+              ? `
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${formatFechaISO(fecha)}</td>
+                <td class="px-6 py-4 whitespace-nowrap"><span class="px-3 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">${area}</span></td>
+                <td class="px-6 py-4 whitespace-nowrap">${tipoBadge}</td>
+                <td class="px-6 py-4 text-sm text-gray-900">${descripcion}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold ${tipo === "Ingreso" ? "text-green-600" : "text-red-600"}">
+                  ${tipo === "Egreso" ? "-" : ""}${formatCLP(monto).replace("-", "")}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600"><i class="fas fa-user-circle mr-1"></i>${responsable}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm">
+                  <button class="text-purple-600 hover:text-purple-900 mr-3" data-action="edit" data-id="${id}" title="Editar"><i class="fas fa-edit"></i></button>
+                  <button class="text-red-600 hover:text-red-900" data-action="delete" data-id="${id}" title="Eliminar"><i class="fas fa-trash"></i></button>
+                </td>
+              `
+              : `
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${formatFechaISO(fecha)}</td>
+                <td class="px-6 py-4 whitespace-nowrap">${tipoBadge}</td>
+                <td class="px-6 py-4 text-sm text-gray-900">${descripcion}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold ${tipo === "Ingreso" ? "text-green-600" : "text-red-600"}">
+                  ${tipo === "Egreso" ? "-" : ""}${formatCLP(monto).replace("-", "")}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600"><i class="fas fa-user-circle mr-1"></i>${responsable}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm">
+                  <button class="text-purple-600 hover:text-purple-900 mr-3" data-action="edit" data-id="${id}" title="Editar"><i class="fas fa-edit"></i></button>
+                  <button class="text-red-600 hover:text-red-900" data-action="delete" data-id="${id}" title="Eliminar"><i class="fas fa-trash"></i></button>
+                </td>
+              `;
+            tbody.appendChild(tr);
+          });
+        }
+
+        function renderAreaTabs() {
+          // Gastos Comunes
+          const gastos = filterRowsByArea("Gastos Comunes");
+          const g = calcCountAndTotal(gastos);
+          setText("gastosCount", String(g.count));
+          setText("gastosTotal", formatCLP(g.total));
+
+          renderMovRowsInto("gastosBody", gastos, { showArea: false });
+
+          // Arriendos
+          const ar = filterRowsByArea("Arriendos");
+          const a = calcCountAndTotal(ar);
+          setText("arriendosCount", String(a.count));
+          setText("arriendosTotal", formatCLP(a.total));
+          renderMovRowsInto("arriendosBody", ar, { showArea: false });
+
+          // Proveedores
+          const pr = filterRowsByArea("Proveedores");
+          const p = calcCountAndTotal(pr);
+          setText("proveedoresCount", String(p.count));
+          setText("proveedoresTotal", formatCLP(p.total));
+          renderMovRowsInto("proveedoresBody", pr, { showArea: false });
+
+          // Empleados
+          const em = filterRowsByArea("Empleados");
+          const e = calcCountAndTotal(em);
+          setText("empleadosCount", String(e.count));
+          setText("empleadosTotal", formatCLP(e.total));
+          renderMovRowsInto("empleadosBody", em, { showArea: false });
+
+          // Caja Chica (neto)
+          const cc = filterRowsByArea("Caja Chica");
+          const c = calcCountAndTotal(cc);
+          setText("cajaChicaCount", String(c.count));
+          setText("cajaChicaTotal", formatCLP(c.total));
+          renderMovRowsInto("cajaChicaBody", cc, { showArea: false });
+
+          // Otros
+          const ot = filterRowsByArea("Otros");
+          const o = calcCountAndTotal(ot);
+          setText("otrosCount", String(o.count));
+          setText("otrosTotal", formatCLP(o.total));
+          renderMovRowsInto("otrosBody", ot, { showArea: false });
+        }
+
+        function renderAlertas() {
+          const list = document.getElementById("alertasList");
+          if (!list) return;
+
+          // Detecta columna estadoPago si existe
+          const iEstado = findCol(MOV.header, ["EstadoPago","Estado Pago"]);
+          const iFecha = MOV.idx?.fecha ?? -1;
+          const iDesc  = MOV.idx?.descripcion ?? -1;
+          const iTipo  = MOV.idx?.tipo ?? -1;
+          const iMonto = MOV.idx?.monto ?? -1;
+          const iArea  = MOV.idx?.area ?? -1;
+
+          const alerts = [];
+
+          // 1) Pendientes / Atrasados (si existe)
+          if (iEstado >= 0) {
+            for (const r of (MOV.rows || [])) {
+              const estado = (r[iEstado] || "").toString().toLowerCase();
+              if (estado.includes("pend") || estado.includes("atras") || estado.includes("moro")) {
+                alerts.push({
+                  kind: "warn",
+                  title: "Pago pendiente/atrasado",
+                  text: `${formatFechaISO(r[iFecha] || "")} · ${(r[iArea] || "")} · ${(r[iDesc] || "")}`
+                });
+              }
+            }
+          }
+
+          // 2) Egresos altos (umbral simple)
+          const TH = 200000;
+          for (const r of (MOV.rows || [])) {
+            const tipo = iTipo >= 0 ? (r[iTipo] || "") : "";
+            const monto = iMonto >= 0 ? Math.abs(parseMoney(r[iMonto])) : 0;
+            if (tipo === "Egreso" && monto >= TH) {
+              alerts.push({
+                kind: "danger",
+                title: "Egreso alto",
+                text: `${formatFechaISO(r[iFecha] || "")} · ${(r[iArea] || "")} · ${formatCLP(monto)} · ${(r[iDesc] || "")}`
+              });
+            }
+          }
+
+          // Render
+          list.innerHTML = "";
+          const shown = alerts.slice(0, 10);
+          setText("alertasCount", String(shown.length));
+
+          if (shown.length === 0) {
+            list.innerHTML = `<div class="p-4 rounded-lg bg-green-50 border border-green-200 text-green-800">
+              <i class="fas fa-check-circle mr-2"></i>No hay alertas por ahora.
+            </div>`;
+            return;
+          }
+
+          shown.forEach(a => {
+            const cls = a.kind === "danger"
+              ? "bg-red-50 border-red-200 text-red-800"
+              : "bg-yellow-50 border-yellow-200 text-yellow-800";
+            const icon = a.kind === "danger" ? "fa-triangle-exclamation" : "fa-circle-exclamation";
+            const div = document.createElement("div");
+            div.className = `p-4 rounded-lg border ${cls}`;
+            div.innerHTML = `<div class="font-semibold"><i class="fas ${icon} mr-2"></i>${a.title}</div><div class="text-sm mt-1">${a.text}</div>`;
+            list.appendChild(div);
+          });
+        }
+
+        function renderResumenMensual() {
+          const now = new Date();
+          const thisMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}`;
+          setText("resumenMes", thisMonth);
+
+          const iFecha = MOV.idx?.fecha ?? -1;
+          const iArea  = MOV.idx?.area ?? -1;
+          const iTipo  = MOV.idx?.tipo ?? -1;
+          const iMonto = MOV.idx?.monto ?? -1;
+
+          const monthRows = (MOV.rows || []).filter(r => {
+            const f = iFecha >= 0 ? (r[iFecha] || "") : "";
+            return monthOfFechaISO(f) === thisMonth;
+          });
+
+          let ing = 0, egr = 0;
+          const byArea = new Map(); // area -> {ing,egr}
+          for (const r of monthRows) {
+            const area = iArea >= 0 ? (r[iArea] || "Sin área") : "Sin área";
+            const tipo = iTipo >= 0 ? (r[iTipo] || "") : "";
+            const monto = iMonto >= 0 ? Math.abs(parseMoney(r[iMonto])) : 0;
+
+            const obj = byArea.get(area) || { ing: 0, egr: 0 };
+            if (tipo === "Ingreso") { ing += monto; obj.ing += monto; }
+            if (tipo === "Egreso")  { egr += monto; obj.egr += monto; }
+            byArea.set(area, obj);
+          }
+
+          setText("resumenIngresosMes", formatCLP(ing));
+          setText("resumenEgresosMes", formatCLP(egr));
+          setText("resumenBalanceMes", formatCLP(ing - egr));
+
+          // Top áreas
+          const tbody = document.getElementById("resumenTopAreas");
+          if (!tbody) return;
+          tbody.innerHTML = "";
+
+          const entries = Array.from(byArea.entries())
+            .map(([area, v]) => ({ area, ...v, neto: v.ing - v.egr }))
+            .sort((a,b) => Math.abs(b.neto) - Math.abs(a.neto))
+            .slice(0, 10);
+
+          if (entries.length === 0) {
+            const tr = document.createElement("tr");
+            tr.innerHTML = `<td class="px-6 py-4 text-sm text-gray-500" colspan="4">No hay movimientos en este mes.</td>`;
+            tbody.appendChild(tr);
+            return;
+          }
+
+          entries.forEach(x => {
+            const tr = document.createElement("tr");
+            tr.className = "hover:bg-gray-50 transition duration-150";
+            tr.innerHTML = `
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${x.area}</td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-green-700 font-semibold">${formatCLP(x.ing)}</td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm text-red-700 font-semibold">${formatCLP(x.egr)}</td>
+              <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold ${x.neto >= 0 ? "text-green-700" : "text-red-700"}">${formatCLP(x.neto)}</td>
+            `;
+            tbody.appendChild(tr);
+          });
+        }
+
+
         function openEditModalById(id) {
           if (!id) return;
           const idx = MOV.idx;
@@ -597,6 +1136,7 @@
           try {
             await apiFetch(`/.netlify/functions/movimientos?id=${encodeURIComponent(id)}`, { method: "DELETE" });
             alert("✅ Eliminado: " + id);
+            logAction("Eliminar", `ID: ${id}`);
             await loadMovimientos();
           } catch (e) {
             alert("❌ No pude eliminar: " + e.message);
@@ -611,6 +1151,11 @@
 
           updateCards(MOV.header, MOV.rows);
           applyFiltersAndRender();
+          renderAreaTabs();
+          // refresca pestañas visibles dependientes
+          if (CURRENT_TAB === "alertas") renderAlertas();
+          if (CURRENT_TAB === "resumen") renderResumenMensual();
+          if (CURRENT_TAB === "actividad") renderActividad();
         }
 
         document.addEventListener("DOMContentLoaded", () => {
@@ -622,7 +1167,7 @@
             if (el) el.addEventListener("change", applyFiltersAndRender);
           });
 
-          document.getElementById("movimientosBody")?.addEventListener("click", (e) => {
+          document.body.addEventListener("click", (e) => {
             const btn = e.target.closest("button[data-action]");
             if (!btn) return;
             const action = btn.dataset.action;
