@@ -5,18 +5,25 @@ const SHEET_NAME = process.env.GOOGLE_SHEETS_MOVIMIENTOS_SHEET || "Movimientos";
 const RANGE = `${SHEET_NAME}!A:Y`; // must cover your columns
 
 function withCors(resp) {
-  // resp is what json() returns: { statusCode, headers?, body }
   resp.headers = {
     ...(resp.headers || {}),
     "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Headers": "Content-Type, Authorization, x-api-key",
-    "Access-Control-Allow-Methods": "GET,POST,DELETE,OPTIONS",
+    "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
   };
   return resp;
 }
 
+function safeJsonParse(body) {
+  try {
+    return JSON.parse(body || "{}");
+  } catch {
+    return {};
+  }
+}
+
+// Alineado a A:Y (mismo orden que tu Sheet)
 function toRow(m) {
-  // Align to the template columns (A:Y). Missing values become "".
   return [
     m.id || "",
     m.fecha || "",              // yyyy-mm-dd
@@ -42,13 +49,46 @@ function toRow(m) {
     m.creadoPorEmail || "",
     m.actualizadoEn || "",
     m.actualizadoPorEmail || "",
-    "" // Monto_Asignado (lo calcula la hoja con fórmula si quieres)
+    "" // Monto_Asignado (si lo calcula la hoja)
   ];
+}
+
+// Convierte una fila A:Y a objeto (para no pisar con "" en PUT)
+function rowToObj(r = []) {
+  return {
+    id: r[0] || "",
+    fecha: r[1] || "",
+    area: r[2] || "",
+    tipo: r[3] || "",
+    descripcion: r[4] || "",
+    monto: Number(r[5] || 0),
+    responsable: r[6] || "",
+    local: r[7] || "",
+    arrendatario: r[8] || "",
+    empleado: r[9] || "",
+    proveedor: r[10] || "",
+    rut: r[11] || "",
+    metodoPago: r[12] || "",
+    nComprobante: r[13] || "",
+    fechaVencimiento: r[14] || "",
+    estadoPago: r[15] || "",
+    concepto: r[16] || "",
+    periodo: r[17] || "",
+    notas: r[18] || "",
+    archivoUrl: r[19] || "",
+    creadoEn: r[20] || "",
+    creadoPorEmail: r[21] || "",
+    actualizadoEn: r[22] || "",
+    actualizadoPorEmail: r[23] || "",
+    // r[24] es "Monto_Asignado" calculado
+  };
 }
 
 async function getSheetIdByName(sheets, spreadsheetId, title) {
   const meta = await sheets.spreadsheets.get({ spreadsheetId });
-  const sheet = (meta.data.sheets || []).find(s => s.properties && s.properties.title === title);
+  const sheet = (meta.data.sheets || []).find(
+    s => s.properties && s.properties.title === title
+  );
   if (!sheet) throw new Error(`No encontré la hoja "${title}" en el Spreadsheet`);
   return sheet.properties.sheetId;
 }
@@ -64,7 +104,7 @@ exports.handler = async (event) => {
       });
     }
 
-    // Protege TODO (GET/POST/DELETE) con API Key
+    // Protege TODO con API Key
     requireApiKey(event);
 
     const sheets = getSheetsClient();
@@ -78,12 +118,18 @@ exports.handler = async (event) => {
     }
 
     if (event.httpMethod === "POST") {
-      const payload = JSON.parse(event.body || "{}");
+      const payload = safeJsonParse(event.body);
+
       if (!payload.fecha || !payload.area || !payload.tipo || !payload.descripcion) {
-        return withCors(json(400, { ok: false, error: "Faltan campos requeridos (fecha, area, tipo, descripcion)." }));
+        return withCors(json(400, {
+          ok: false,
+          error: "Faltan campos requeridos (fecha, area, tipo, descripcion)."
+        }));
       }
+
+      // Generar ID si no viene
       if (!payload.id) {
-        const d = payload.fecha.replaceAll("-", "");
+        const d = String(payload.fecha).replaceAll("-", "");
         payload.id = `MOV-${d}-${String(Math.floor(Math.random() * 9999)).padStart(4, "0")}`;
       }
 
@@ -101,18 +147,17 @@ exports.handler = async (event) => {
     }
 
     if (event.httpMethod === "DELETE") {
-      // Acepta id por query (?id=...) o por body {id:"..."}
       const qsId = event.queryStringParameters && event.queryStringParameters.id;
-      const bodyId = (() => {
-        try { return JSON.parse(event.body || "{}").id; } catch { return ""; }
-      })();
-      const id = (qsId || bodyId || "").trim();
+      const body = safeJsonParse(event.body);
+      const id = (qsId || body.id || "").trim();
 
       if (!id) {
-        return withCors(json(400, { ok: false, error: "Falta id para eliminar. Usa ?id=... o body {id}." }));
+        return withCors(json(400, {
+          ok: false,
+          error: "Falta id para eliminar. Usa ?id=... o body {id}."
+        }));
       }
 
-      // Leer datos para ubicar la fila por ID (columna A)
       const res = await sheets.spreadsheets.values.get({ spreadsheetId, range: RANGE });
       const values = res.data.values || [];
       const [header, ...rows] = values;
@@ -126,31 +171,79 @@ exports.handler = async (event) => {
         return withCors(json(404, { ok: false, error: `No encontré movimiento con id "${id}".` }));
       }
 
-      // En batchUpdate, las filas son 0-indexed contando desde el inicio de la hoja.
-      // Como rows excluye el header, hay que sumar 1 para saltar la fila de encabezado.
+      // En batchUpdate: indices 0-based y rows excluye header => +1
       const sheetRowIndex = rowIndexInRows + 1;
-
       const sheetId = await getSheetIdByName(sheets, spreadsheetId, SHEET_NAME);
 
       await sheets.spreadsheets.batchUpdate({
         spreadsheetId,
         requestBody: {
-          requests: [
-            {
-              deleteDimension: {
-                range: {
-                  sheetId,
-                  dimension: "ROWS",
-                  startIndex: sheetRowIndex,
-                  endIndex: sheetRowIndex + 1,
-                },
+          requests: [{
+            deleteDimension: {
+              range: {
+                sheetId,
+                dimension: "ROWS",
+                startIndex: sheetRowIndex,
+                endIndex: sheetRowIndex + 1,
               },
             },
-          ],
+          }],
         },
       });
 
       return withCors(json(200, { ok: true, deletedId: id }));
+    }
+
+    if (event.httpMethod === "PUT") {
+      const qsId = event.queryStringParameters && event.queryStringParameters.id;
+      const payload = safeJsonParse(event.body);
+      const id = (qsId || payload.id || "").trim();
+
+      if (!id) return withCors(json(400, { ok: false, error: "Falta id para editar." }));
+
+      // Leer para encontrar fila + obtener valores actuales
+      const res = await sheets.spreadsheets.values.get({ spreadsheetId, range: RANGE });
+      const values = res.data.values || [];
+      const [header, ...rows] = values;
+
+      const rowIndexInRows = rows.findIndex(r => (r[0] || "").toString().trim() === id);
+      if (rowIndexInRows < 0) {
+        return withCors(json(404, { ok: false, error: `No encontré id "${id}".` }));
+      }
+
+      const existingRow = rows[rowIndexInRows] || [];
+      const existingObj = rowToObj(existingRow);
+
+      // Mezcla: mantiene lo viejo si no lo mandas desde la web
+      const merged = {
+        ...existingObj,
+        ...payload,
+        id,
+        monto: payload.monto != null ? Number(payload.monto || 0) : existingObj.monto,
+        actualizadoEn: new Date().toISOString(),
+      };
+
+      // Validación mínima (igual que POST, porque tu modal siempre manda esto)
+      if (!merged.fecha || !merged.area || !merged.tipo || !merged.descripcion) {
+        return withCors(json(400, {
+          ok: false,
+          error: "Faltan campos requeridos (fecha, area, tipo, descripcion) en edición."
+        }));
+      }
+
+      // Fila real en la hoja (A1 es header)
+      const sheetRowNumber = rowIndexInRows + 2; // +1 header +1 por A1
+      const updateRange = `${SHEET_NAME}!A${sheetRowNumber}:Y${sheetRowNumber}`;
+      const row = toRow(merged);
+
+      await sheets.spreadsheets.values.update({
+        spreadsheetId,
+        range: updateRange,
+        valueInputOption: "USER_ENTERED",
+        requestBody: { values: [row] },
+      });
+
+      return withCors(json(200, { ok: true, id }));
     }
 
     return withCors(json(405, { ok: false, error: "Method not allowed" }));
