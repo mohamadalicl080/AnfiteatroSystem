@@ -555,25 +555,26 @@
   "actividad",
 ];
 
-function showTab(tabName, btn) {
-  // permisos para actividad
-  if (tabName === "actividad" && currentUser.role !== "admin") {
-    alert("⛔ Solo el Administrador puede acceder al Registro de Actividad");
-    tabName = "movimientos";
-  }
+function showTab(tabName, evOrBtn) {
+  // Soporta inline onclick="showTab('x', event)" o listeners que pasen el botón
+  const btn = (evOrBtn && evOrBtn.target) ? evOrBtn.target.closest("button") : evOrBtn;
 
-  // ocultar todos
+  const safeTab = TAB_IDS.includes(tabName) ? tabName : "movimientos";
+
+  // Oculta todas
   TAB_IDS.forEach(t => {
     const el = document.getElementById(`${t}-tab`);
     if (el) el.classList.add("hidden");
   });
 
-  // mostrar seleccionado
-  const target = document.getElementById(`${tabName}-tab`);
-  if (target) target.classList.remove("hidden");
+  // Muestra elegida
+  document.getElementById(`${safeTab}-tab`)?.classList.remove("hidden");
 
-  // estilo activo
-  document.querySelectorAll("button[data-tab]").forEach(b => {
+  // Estilos activo/inactivo
+  // (tomamos todos los botones del bar de pestañas)
+  const bar = document.querySelector(".bg-white.rounded-t-xl.shadow-sm.border-b .flex");
+  const buttons = bar ? bar.querySelectorAll("button") : document.querySelectorAll("button");
+  buttons.forEach(b => {
     b.classList.remove("tab-active");
     b.classList.add("text-gray-600");
   });
@@ -583,40 +584,6 @@ function showTab(tabName, btn) {
     btn.classList.remove("text-gray-600");
   }
 }
-);
-
-          // Mostrar seleccionada
-          const targetId = TAB_MAP[tabName] || "movimientos-tab";
-          const targetEl = document.getElementById(targetId);
-          if (targetEl) targetEl.classList.remove("hidden");
-
-          // Registro Actividad: permiso admin
-          if (tabName === "actividad" && currentUser.role !== "admin") {
-            alert("⛔ Solo el Administrador puede acceder al Registro de Actividad");
-            CURRENT_TAB = "movimientos";
-            document.getElementById("movimientos-tab")?.classList.remove("hidden");
-            document.getElementById("actividad-tab")?.classList.add("hidden");
-            return;
-          }
-
-          // Estilos tabs activos
-          if (ev && ev.target) {
-            document.querySelectorAll('.py-4').forEach(tab => {
-              tab.classList.remove('tab-active');
-              tab.classList.add('text-gray-600');
-            });
-            const btn = ev.target.closest('button');
-            if (btn) {
-              btn.classList.add('tab-active');
-              btn.classList.remove('text-gray-600');
-            }
-          }
-
-          // Render extra según pestaña
-          if (tabName === "alertas") renderAlertas();
-          if (tabName === "resumen") renderResumenMensual();
-          if (tabName === "actividad") renderActividad();
-        }
 
 
         function openNewMovementModal() {
