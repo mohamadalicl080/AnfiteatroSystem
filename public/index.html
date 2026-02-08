@@ -840,16 +840,22 @@
       return { ingresosMes, egresosMes, ingresosTotal, egresosTotal, balanceTotal: ingresosTotal-egresosTotal, morosos, cajaChica };
     }
 
-    function updateCards(header, rows) {
-      const s = calcStatsFromMovs(header, rows);
-      setText("cardIngresosMes", formatCLP(s.ingresosMes));
-      setText("cardEgresosMes", formatCLP(s.egresosMes));
-      setText("cardIngresosTotal", formatCLP(s.ingresosTotal));
-      setText("cardEgresosTotal", formatCLP(s.egresosTotal));
-      setText("cardBalanceTotal", formatCLP(s.balanceTotal));
-      setText("cardMorosos", String(s.morosos));
-      setText("cardCajaChica", formatCLP(s.cajaChica));
-    }
+ function updateCards(header, rows) {
+  const s = calcStatsFromMovs(header, rows);
+
+  setText("cardIngresosMes", formatCLP(s.ingresosMes));
+  setText("cardEgresosMes", formatCLP(s.egresosMes));
+  setText("cardIngresosTotal", formatCLP(s.ingresosTotal));
+  setText("cardEgresosTotal", formatCLP(s.egresosTotal));
+
+  // ✅ FIX: balance correcto = ingresos - egresos
+  const balanceTotal = (Number(s.ingresosTotal) || 0) - (Number(s.egresosTotal) || 0);
+  setText("cardBalanceTotal", formatCLP(balanceTotal));
+
+  setText("cardMorosos", String(s.morosos));
+  setText("cardCajaChica", formatCLP(s.cajaChica));
+}
+
 
     function readModalFields() {
       const fecha = document.getElementById("mvFecha")?.value?.trim() || "";
