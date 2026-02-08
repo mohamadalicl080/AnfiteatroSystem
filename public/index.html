@@ -506,79 +506,21 @@
           <textarea id="mvDescripcion" rows="3" placeholder="Ej: Pago arriendo Local 12 - Febrero 2026" class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition duration-200" required></textarea>
         </div>
 
-        <!-- ✅ Campos extra (como en tu Sheet) -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label class="block text-sm font-semibold text-gray-700 mb-2">Local</label>
-            <input id="mvLocal" type="text" placeholder="Ej: Local 12"
-              class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition duration-200">
-          </div>
-
-          <div>
-            <label class="block text-sm font-semibold text-gray-700 mb-2">Empleado</label>
-            <input id="mvEmpleado" type="text" placeholder="Ej: Juan Pérez"
-              class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition duration-200">
-          </div>
-
-          <div>
-            <label class="block text-sm font-semibold text-gray-700 mb-2">Arrendatario / Propietario</label>
-            <input id="mvArrendatario" type="text" placeholder="Ej: María González"
-              class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition duration-200">
-          </div>
-
-          <div>
-            <label class="block text-sm font-semibold text-gray-700 mb-2">Proveedor / Empresa</label>
-            <input id="mvProveedor" type="text" placeholder="Ej: Empresa S.A."
-              class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition duration-200">
-          </div>
-
-          <div>
-            <label class="block text-sm font-semibold text-gray-700 mb-2">RUT</label>
-            <input id="mvRut" type="text" placeholder="Ej: 12.345.678-9"
-              class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition duration-200">
-          </div>
-
-          <div>
-            <label class="block text-sm font-semibold text-gray-700 mb-2">Método de Pago</label>
-            <select id="mvMetodoPago"
-              class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition duration-200">
-              <option value="">Seleccione...</option>
-              <option>Transferencia</option>
-              <option>Efectivo</option>
-              <option>Tarjeta</option>
-              <option>Cheque</option>
-              <option>Otro</option>
-            </select>
-          </div>
-
-          <div>
-            <label class="block text-sm font-semibold text-gray-700 mb-2">Fecha Vencimiento</label>
-            <input id="mvFechaVencimiento" type="date"
-              class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition duration-200">
-          </div>
-
-          <div>
-            <label class="block text-sm font-semibold text-gray-700 mb-2">N° Comprobante</label>
-            <input id="mvNComprobante" type="text" placeholder="Ej: 001234"
-              class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition duration-200">
-          </div>
-
-          <div class="md:col-span-2">
-            <label class="block text-sm font-semibold text-gray-700 mb-2">Concepto</label>
-            <input id="mvConcepto" type="text" placeholder="Ej: Arriendo / Mantención / Sueldo"
-              class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition duration-200">
-          </div>
-
-          <div class="md:col-span-2">
-            <label class="block text-sm font-semibold text-gray-700 mb-2">Notas</label>
-            <textarea id="mvNotas" rows="3" placeholder="Observaciones..."
-              class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition duration-200"></textarea>
-          </div>
-        </div>
-
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-2">📅 Período Correspondiente</label>
           <input id="mvPeriodo" type="month" value="2026-02" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+        </div>
+
+        <!-- ✅ NUEVO: Estado de Pago -->
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-2">Estado de Pago</label>
+          <select id="mvEstadoPago" class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition duration-200">
+            <option value="">Seleccione...</option>
+            <option>Pendiente</option>
+            <option>Pagado</option>
+            <option>Atrasado</option>
+            <option>Anulado</option>
+          </select>
         </div>
 
         <div class="bg-purple-50 border border-purple-200 rounded-lg p-4">
@@ -695,6 +637,10 @@
       const pEl = document.getElementById('mvPeriodo');
       if (pEl) pEl.value = ym;
 
+      // ✅ default estado pago vacío
+      const ep = document.getElementById("mvEstadoPago");
+      if (ep) ep.value = "";
+
       document.getElementById('newMovementModal').classList.remove('hidden');
     }
     function closeModal() { document.getElementById('newMovementModal').classList.add('hidden'); }
@@ -744,18 +690,8 @@
         monto: findCol(header, ["Monto", "MontoAsignado", "Monto Asignado", "Monto_Signado", "Monto Signado", "Monto_Asignado"]),
         responsable: findCol(header, ["Responsable"]),
         periodo: findCol(header, ["Periodo", "Período"]),
-
-        // ✅ extras (si existen en el Sheet)
-        local: findCol(header, ["Local"]),
-        empleado: findCol(header, ["Empleado"]),
-        arrendatario: findCol(header, ["Arrendatario", "Arrendatario-Propietario", "Arrendatario/Propietario"]),
-        proveedor: findCol(header, ["Proveedor", "Proveedor - Empresa", "Proveedor/Empresa", "Empresa"]),
-        rut: findCol(header, ["RUT", "Rut"]),
-        metodoPago: findCol(header, ["MetodoPago", "Método de Pago", "Metodo de Pago", "Metodo Pago", "Método Pago"]),
-        fechaVencimiento: findCol(header, ["FechaVencimiento", "Fecha Vencimiento", "Vencimiento", "Fecha de Vencimiento"]),
-        nComprobante: findCol(header, ["NComprobante", "N° Comprobante", "Numero Comprobante", "Número Comprobante", "Nº Comprobante"]),
-        concepto: findCol(header, ["Concepto"]),
-        notas: findCol(header, ["Notas", "Observaciones"]),
+        // ✅ NUEVO: Estado de Pago
+        estadoPago: findCol(header, ["EstadoPago","Estado Pago","Estado de Pago","Estado"]),
       };
     }
 
@@ -763,7 +699,7 @@
       const iMonto = findCol(header, ["MontoAsignado","Monto Asignado","Monto","Monto_Signado","Monto Signado","Monto_Asignado"]);
       const iTipo  = findCol(header, ["Tipo"]);
       const iFecha = findCol(header, ["Fecha"]);
-      const iEstadoPago = findCol(header, ["EstadoPago","Estado Pago"]);
+      const iEstadoPago = findCol(header, ["EstadoPago","Estado Pago","Estado de Pago","Estado"]);
       const iArea  = findCol(header, ["Área","Area"]);
 
       const now = new Date();
@@ -825,17 +761,8 @@
       const monto = Number(document.getElementById("mvMonto")?.value || 0) || 0;
       const periodo = document.getElementById("mvPeriodo")?.value?.trim() || "";
 
-      // ✅ extras
-      const local = document.getElementById("mvLocal")?.value?.trim() || "";
-      const empleado = document.getElementById("mvEmpleado")?.value?.trim() || "";
-      const arrendatario = document.getElementById("mvArrendatario")?.value?.trim() || "";
-      const proveedor = document.getElementById("mvProveedor")?.value?.trim() || "";
-      const rut = document.getElementById("mvRut")?.value?.trim() || "";
-      const metodoPago = document.getElementById("mvMetodoPago")?.value?.trim() || "";
-      const fechaVencimiento = document.getElementById("mvFechaVencimiento")?.value?.trim() || "";
-      const nComprobante = document.getElementById("mvNComprobante")?.value?.trim() || "";
-      const concepto = document.getElementById("mvConcepto")?.value?.trim() || "";
-      const notas = document.getElementById("mvNotas")?.value?.trim() || "";
+      // ✅ NUEVO: Estado de Pago
+      const estadoPago = document.getElementById("mvEstadoPago")?.value?.trim() || "";
 
       const AREA_MAP = {
         "gastos-comunes": "Gastos Comunes",
@@ -856,18 +783,8 @@
         fecha, area, tipo, descripcion, monto,
         responsable: currentUser?.name || "Admin",
         periodo,
-
-        // ✅ extras
-        local,
-        empleado,
-        arrendatario,
-        proveedor,
-        rut,
-        metodoPago,
-        fechaVencimiento,
-        nComprobante,
-        concepto,
-        notas
+        // ✅ NUEVO
+        estadoPago
       };
     }
 
@@ -883,14 +800,14 @@
             body: JSON.stringify(payload)
           });
           alert(`✅ Movimiento editado!\nID: ${result.id || EDITING_ID}`);
-          logAction("Editar", `${payload.area} · ${payload.tipo} · ${formatCLP(payload.monto)} · ${payload.descripcion}`);
+          logAction("Editar", `${payload.area} · ${payload.tipo} · ${formatCLP(payload.monto)} · ${payload.descripcion} · ${payload.estadoPago || "Sin estado"}`);
         } else {
           const result = await apiFetch("/.netlify/functions/movimientos", {
             method: "POST",
             body: JSON.stringify(payload)
           });
           alert(`✅ Movimiento guardado!\nID: ${result.id}`);
-          logAction("Crear", `${payload.area} · ${payload.tipo} · ${formatCLP(payload.monto)} · ${payload.descripcion}`);
+          logAction("Crear", `${payload.area} · ${payload.tipo} · ${formatCLP(payload.monto)} · ${payload.descripcion} · ${payload.estadoPago || "Sin estado"}`);
         }
 
         closeModal();
@@ -1069,7 +986,7 @@
       const list = document.getElementById("alertasList");
       if (!list) return;
 
-      const iEstado = findCol(MOV.header, ["EstadoPago","Estado Pago"]);
+      const iEstado = findCol(MOV.header, ["EstadoPago","Estado Pago","Estado de Pago","Estado"]);
       const iFecha = MOV.idx?.fecha ?? -1;
       const iDesc  = MOV.idx?.descripcion ?? -1;
       const iTipo  = MOV.idx?.tipo ?? -1;
@@ -1227,17 +1144,11 @@
       document.getElementById("mvMonto").value = Math.abs(monto);
       if (periodo) document.getElementById("mvPeriodo").value = periodo;
 
-      // ✅ carga extras (si existen en el Sheet)
-      document.getElementById("mvLocal").value = idx.local >= 0 ? (row[idx.local] || "") : "";
-      document.getElementById("mvEmpleado").value = idx.empleado >= 0 ? (row[idx.empleado] || "") : "";
-      document.getElementById("mvArrendatario").value = idx.arrendatario >= 0 ? (row[idx.arrendatario] || "") : "";
-      document.getElementById("mvProveedor").value = idx.proveedor >= 0 ? (row[idx.proveedor] || "") : "";
-      document.getElementById("mvRut").value = idx.rut >= 0 ? (row[idx.rut] || "") : "";
-      document.getElementById("mvMetodoPago").value = idx.metodoPago >= 0 ? (row[idx.metodoPago] || "") : "";
-      document.getElementById("mvFechaVencimiento").value = idx.fechaVencimiento >= 0 ? (row[idx.fechaVencimiento] || "") : "";
-      document.getElementById("mvNComprobante").value = idx.nComprobante >= 0 ? (row[idx.nComprobante] || "") : "";
-      document.getElementById("mvConcepto").value = idx.concepto >= 0 ? (row[idx.concepto] || "") : "";
-      document.getElementById("mvNotas").value = idx.notas >= 0 ? (row[idx.notas] || "") : "";
+      // ✅ NUEVO: cargar estado pago si viene en el sheet
+      const ep = document.getElementById("mvEstadoPago");
+      if (ep) {
+        ep.value = (idx.estadoPago >= 0 ? (row[idx.estadoPago] || "") : "");
+      }
 
       document.getElementById('newMovementModal').classList.remove('hidden');
     }
@@ -1265,6 +1176,7 @@
       applyFiltersAndRender();
       renderAreaTabs();
 
+      // refresh current tab dependent
       if (CURRENT_TAB === "alertas") renderAlertas();
       if (CURRENT_TAB === "resumen") renderResumenMensual();
       if (CURRENT_TAB === "actividad") renderActividad();
@@ -1273,7 +1185,7 @@
     document.addEventListener("DOMContentLoaded", () => {
       // Tabs click
       document.querySelectorAll(".tabs-btn[data-tab]").forEach(btn => {
-        btn.addEventListener("click", (e) => {
+        btn.addEventListener("click", () => {
           showTab(btn.dataset.tab, btn);
         });
       });
@@ -1318,4 +1230,5 @@
   </script>
 </body>
 </html>
+
 
