@@ -214,15 +214,10 @@
         </table>
       </div>
 
-      <div class="flex justify-between items-center mt-6">
-        <p class="text-sm text-gray-600">Mostrando últimos movimientos</p>
-        <div class="flex space-x-2">
-          <button class="px-4 py-2 border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50">Anterior</button>
-          <button class="px-4 py-2 bg-purple-600 text-white rounded-lg">1</button>
-          <button class="px-4 py-2 border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50">2</button>
-          <button class="px-4 py-2 border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50">3</button>
-          <button class="px-4 py-2 border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50">Siguiente</button>
-        </div>
+      <!-- ✅ Pagination REAL (no demo) -->
+      <div class="flex flex-col md:flex-row md:justify-between md:items-center gap-3 mt-6">
+        <p id="movimientosInfo" class="text-sm text-gray-600">Mostrando 0-0 de 0 movimientos</p>
+        <div id="paginationControls" class="flex flex-wrap gap-2 justify-end"></div>
       </div>
     </div>
 
@@ -511,7 +506,7 @@
           <input id="mvPeriodo" type="month" value="2026-02" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
         </div>
 
-        <!-- ✅ Estado de Pago -->
+        <!-- Estado de pago -->
         <div>
           <label class="block text-sm font-semibold text-gray-700 mb-2">Estado de Pago</label>
           <select id="mvEstadoPago" class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition duration-200">
@@ -521,83 +516,6 @@
             <option>Atrasado</option>
             <option>Anulado</option>
           </select>
-        </div>
-
-        <!-- ✅ Detalles adicionales (RESTAURADO) -->
-        <div class="pt-2">
-          <h4 class="text-sm font-bold text-gray-700 flex items-center gap-2">
-            <i class="fas fa-clipboard-list text-purple-600"></i>Detalles adicionales
-          </h4>
-          <p class="text-xs text-gray-500 mt-1">Completa solo lo que aplique (según el tipo de movimiento).</p>
-        </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label class="block text-sm font-semibold text-gray-700 mb-2">Local</label>
-            <input id="mvLocal" type="text" placeholder="Ej: Local 12"
-              class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition duration-200">
-          </div>
-
-          <div>
-            <label class="block text-sm font-semibold text-gray-700 mb-2">Empleado</label>
-            <input id="mvEmpleado" type="text" placeholder="Ej: Juan Pérez"
-              class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition duration-200">
-          </div>
-
-          <div>
-            <label class="block text-sm font-semibold text-gray-700 mb-2">Arrendatario / Propietario</label>
-            <input id="mvArrendatarioPropietario" type="text" placeholder="Ej: Pedro Soto / Inmobiliaria X"
-              class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition duration-200">
-          </div>
-
-          <div>
-            <label class="block text-sm font-semibold text-gray-700 mb-2">Proveedor / Empresa</label>
-            <input id="mvProveedorEmpresa" type="text" placeholder="Ej: Chilectra / Proveedor ABC"
-              class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition duration-200">
-          </div>
-
-          <div>
-            <label class="block text-sm font-semibold text-gray-700 mb-2">RUT</label>
-            <input id="mvRut" type="text" placeholder="Ej: 12.345.678-9"
-              class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition duration-200">
-          </div>
-
-          <div>
-            <label class="block text-sm font-semibold text-gray-700 mb-2">Método de pago</label>
-            <select id="mvMetodoPago"
-              class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition duration-200">
-              <option value="">Seleccione...</option>
-              <option>Efectivo</option>
-              <option>Transferencia</option>
-              <option>Tarjeta</option>
-              <option>Cheque</option>
-              <option>Otro</option>
-            </select>
-          </div>
-
-          <div>
-            <label class="block text-sm font-semibold text-gray-700 mb-2">Fecha vencimiento</label>
-            <input id="mvFechaVencimiento" type="date"
-              class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition duration-200">
-          </div>
-
-          <div>
-            <label class="block text-sm font-semibold text-gray-700 mb-2">Número comprobante</label>
-            <input id="mvNumeroComprobante" type="text" placeholder="Ej: 000123"
-              class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition duration-200">
-          </div>
-
-          <div class="md:col-span-2">
-            <label class="block text-sm font-semibold text-gray-700 mb-2">Concepto</label>
-            <input id="mvConcepto" type="text" placeholder="Ej: Arriendo / Luz / Sueldo / Mantención"
-              class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition duration-200">
-          </div>
-
-          <div class="md:col-span-2">
-            <label class="block text-sm font-semibold text-gray-700 mb-2">Notas</label>
-            <textarea id="mvNotas" rows="3" placeholder="Observaciones internas..."
-              class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition duration-200"></textarea>
-          </div>
         </div>
 
         <div class="bg-purple-50 border border-purple-200 rounded-lg p-4">
@@ -623,6 +541,12 @@
     const currentUser = { name: 'Admin', role: 'admin', email: 'admin@anfiteatro.cl' };
     const MOV = { header: [], rows: [], idx: null };
     let EDITING_ID = null;
+
+    // ✅ Pagination (REAL)
+    const PAGE_SIZE = 5;          // para que se vea como "Mostrando 1-5 de ..."
+    let MOV_PAGE = 1;
+    function clamp(n, min, max) { return Math.max(min, Math.min(max, n)); }
+    function resetPagination() { MOV_PAGE = 1; }
 
     // Tabs
     const TAB_IDS = [
@@ -714,19 +638,9 @@
       const pEl = document.getElementById('mvPeriodo');
       if (pEl) pEl.value = ym;
 
-      // ✅ default estado pago vacío
+      // default estado pago vacío
       const ep = document.getElementById("mvEstadoPago");
       if (ep) ep.value = "";
-
-      // ✅ limpiar detalles adicionales
-      const extraIds = [
-        "mvLocal","mvEmpleado","mvArrendatarioPropietario","mvProveedorEmpresa","mvRut",
-        "mvMetodoPago","mvFechaVencimiento","mvNumeroComprobante","mvConcepto","mvNotas"
-      ];
-      extraIds.forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.value = "";
-      });
 
       document.getElementById('newMovementModal').classList.remove('hidden');
     }
@@ -777,19 +691,7 @@
         monto: findCol(header, ["Monto", "MontoAsignado", "Monto Asignado", "Monto_Signado", "Monto Signado", "Monto_Asignado"]),
         responsable: findCol(header, ["Responsable"]),
         periodo: findCol(header, ["Periodo", "Período"]),
-        // ✅ Estado de Pago
         estadoPago: findCol(header, ["EstadoPago","Estado Pago","Estado de Pago","Estado"]),
-        // ✅ Detalles adicionales (opcional, pero útil para editar/leer desde Sheet)
-        local: findCol(header, ["Local"]),
-        empleado: findCol(header, ["Empleado"]),
-        arrendatarioPropietario: findCol(header, ["Arrendatario-Propietario","Arrendatario / Propietario","ArrendatarioPropietario"]),
-        proveedorEmpresa: findCol(header, ["Proveedor - Empresa","Proveedor/Empresa","ProveedorEmpresa"]),
-        rut: findCol(header, ["RUT","Rut"]),
-        metodoPago: findCol(header, ["Metodo de Pago","Método de pago","MetodoPago"]),
-        fechaVencimiento: findCol(header, ["Fecha Vencimiento","Fecha vencimiento","FechaVencimiento"]),
-        numeroComprobante: findCol(header, ["Numero Comprobante","Número comprobante","NumeroComprobante"]),
-        concepto: findCol(header, ["Concepto"]),
-        notas: findCol(header, ["Notas","Nota"]),
       };
     }
 
@@ -840,22 +742,16 @@
       return { ingresosMes, egresosMes, ingresosTotal, egresosTotal, balanceTotal: ingresosTotal-egresosTotal, morosos, cajaChica };
     }
 
- function updateCards(header, rows) {
-  const s = calcStatsFromMovs(header, rows);
-
-  setText("cardIngresosMes", formatCLP(s.ingresosMes));
-  setText("cardEgresosMes", formatCLP(s.egresosMes));
-  setText("cardIngresosTotal", formatCLP(s.ingresosTotal));
-  setText("cardEgresosTotal", formatCLP(s.egresosTotal));
-
-  // ✅ FIX: balance correcto = ingresos - egresos
-  const balanceTotal = (Number(s.ingresosTotal) || 0) - (Number(s.egresosTotal) || 0);
-  setText("cardBalanceTotal", formatCLP(balanceTotal));
-
-  setText("cardMorosos", String(s.morosos));
-  setText("cardCajaChica", formatCLP(s.cajaChica));
-}
-
+    function updateCards(header, rows) {
+      const s = calcStatsFromMovs(header, rows);
+      setText("cardIngresosMes", formatCLP(s.ingresosMes));
+      setText("cardEgresosMes", formatCLP(s.egresosMes));
+      setText("cardIngresosTotal", formatCLP(s.ingresosTotal));
+      setText("cardEgresosTotal", formatCLP(s.egresosTotal));
+      setText("cardBalanceTotal", formatCLP(s.balanceTotal));
+      setText("cardMorosos", String(s.morosos));
+      setText("cardCajaChica", formatCLP(s.cajaChica));
+    }
 
     function readModalFields() {
       const fecha = document.getElementById("mvFecha")?.value?.trim() || "";
@@ -864,21 +760,7 @@
       const descripcion = document.getElementById("mvDescripcion")?.value?.trim() || "";
       const monto = Number(document.getElementById("mvMonto")?.value || 0) || 0;
       const periodo = document.getElementById("mvPeriodo")?.value?.trim() || "";
-
-      // ✅ Estado de Pago
       const estadoPago = document.getElementById("mvEstadoPago")?.value?.trim() || "";
-
-      // ✅ Detalles adicionales (restaurados)
-      const local = document.getElementById("mvLocal")?.value?.trim() || "";
-      const empleado = document.getElementById("mvEmpleado")?.value?.trim() || "";
-      const arrendatarioPropietario = document.getElementById("mvArrendatarioPropietario")?.value?.trim() || "";
-      const proveedorEmpresa = document.getElementById("mvProveedorEmpresa")?.value?.trim() || "";
-      const rut = document.getElementById("mvRut")?.value?.trim() || "";
-      const metodoPago = document.getElementById("mvMetodoPago")?.value?.trim() || "";
-      const fechaVencimiento = document.getElementById("mvFechaVencimiento")?.value?.trim() || "";
-      const numeroComprobante = document.getElementById("mvNumeroComprobante")?.value?.trim() || "";
-      const concepto = document.getElementById("mvConcepto")?.value?.trim() || "";
-      const notas = document.getElementById("mvNotas")?.value?.trim() || "";
 
       const AREA_MAP = {
         "gastos-comunes": "Gastos Comunes",
@@ -899,39 +781,7 @@
         fecha, area, tipo, descripcion, monto,
         responsable: currentUser?.name || "Admin",
         periodo,
-
-        // ✅ Estado de Pago
-        estadoPago,
-
-        // ✅ Detalles adicionales
-        local,
-        empleado,
-        arrendatarioPropietario,
-        proveedorEmpresa,
-        rut,
-        metodoPago,
-        fechaVencimiento,
-        numeroComprobante,
-        concepto,
-        notas,
-
-        // ✅ Duplicados “amigables” por si tu Sheet usa headers distintos
-        "Local": local,
-        "Empleado": empleado,
-        "Arrendatario-Propietario": arrendatarioPropietario,
-        "Arrendatario / Propietario": arrendatarioPropietario,
-        "Proveedor - Empresa": proveedorEmpresa,
-        "Proveedor/Empresa": proveedorEmpresa,
-        "RUT": rut,
-        "Rut": rut,
-        "Metodo de Pago": metodoPago,
-        "Método de pago": metodoPago,
-        "Fecha Vencimiento": fechaVencimiento,
-        "Fecha vencimiento": fechaVencimiento,
-        "Numero Comprobante": numeroComprobante,
-        "Número comprobante": numeroComprobante,
-        "Concepto": concepto,
-        "Notas": notas
+        estadoPago
       };
     }
 
@@ -941,7 +791,7 @@
         const payload = readModalFields();
 
         if (EDITING_ID) {
-          payload.id = EDITING_ID; // PUT espera id en body
+          payload.id = EDITING_ID;
           const result = await apiFetch(`/.netlify/functions/movimientos`, {
             method: "PUT",
             body: JSON.stringify(payload)
@@ -958,6 +808,7 @@
         }
 
         closeModal();
+        resetPagination();
         await loadMovimientos();
       } catch (err) {
         alert("❌ Error guardando: " + err.message);
@@ -974,28 +825,70 @@
       };
     }
 
-    function applyFiltersAndRender() {
-      const tbody = document.getElementById("movimientosBody");
-      if (!tbody || !MOV.idx) return;
-
-      const { area, tipo, desde, hasta } = getFilters();
-      let filtered = MOV.rows.slice();
-
-      if (area !== "Todas las áreas") filtered = filtered.filter(r => (r[MOV.idx.area] || "") === area);
-      if (tipo !== "Todos") filtered = filtered.filter(r => (r[MOV.idx.tipo] || "") === tipo);
-      if (desde) filtered = filtered.filter(r => (r[MOV.idx.fecha] || "") >= desde);
-      if (hasta) filtered = filtered.filter(r => (r[MOV.idx.fecha] || "") <= hasta);
-
-      renderMovRows(filtered);
+    // ✅ UI pagination helpers
+    function setMovimientosInfo(start, end, total) {
+      const info = document.getElementById("movimientosInfo");
+      if (!info) return;
+      if (total === 0) info.textContent = "Mostrando 0-0 de 0 movimientos";
+      else info.textContent = `Mostrando ${start}-${end} de ${total} movimientos`;
     }
 
-    function renderMovRows(rows) {
+    function renderPaginationControls(totalPages) {
+      const container = document.getElementById("paginationControls");
+      if (!container) return;
+      container.innerHTML = "";
+
+      // nothing to paginate
+      if (totalPages <= 1) return;
+
+      const btnBase = "px-4 py-2 border rounded-lg text-gray-700 hover:bg-gray-50 transition";
+      const btnDisabled = "opacity-50 cursor-not-allowed";
+      const btnActive = "px-4 py-2 bg-purple-600 text-white rounded-lg";
+
+      const makeBtn = (label, onClick, disabled=false, active=false) => {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.className = active ? btnActive : btnBase;
+        b.textContent = label;
+        if (disabled) {
+          b.classList.add(...btnDisabled.split(" "));
+          b.disabled = true;
+        } else {
+          b.addEventListener("click", onClick);
+        }
+        return b;
+      };
+
+      // Prev
+      container.appendChild(
+        makeBtn("Anterior", () => { MOV_PAGE = clamp(MOV_PAGE - 1, 1, totalPages); applyFiltersAndRender(); }, MOV_PAGE === 1)
+      );
+
+      // page numbers (window)
+      const windowSize = 5;
+      let start = Math.max(1, MOV_PAGE - Math.floor(windowSize/2));
+      let end = Math.min(totalPages, start + windowSize - 1);
+      start = Math.max(1, end - windowSize + 1);
+
+      for (let p = start; p <= end; p++) {
+        container.appendChild(
+          makeBtn(String(p), () => { MOV_PAGE = p; applyFiltersAndRender(); }, false, p === MOV_PAGE)
+        );
+      }
+
+      // Next
+      container.appendChild(
+        makeBtn("Siguiente", () => { MOV_PAGE = clamp(MOV_PAGE + 1, 1, totalPages); applyFiltersAndRender(); }, MOV_PAGE === totalPages)
+      );
+    }
+
+    // ✅ Movimientos main render (no reverse inside)
+    function renderMovRowsPage(rows) {
       const tbody = document.getElementById("movimientosBody");
       if (!tbody) return;
       tbody.innerHTML = "";
 
-      const lastRows = rows.slice().reverse().slice(0, 20);
-      lastRows.forEach(r => {
+      (rows || []).forEach(r => {
         const id = MOV.idx.id >= 0 ? (r[MOV.idx.id] || "") : "";
         const fecha = MOV.idx.fecha >= 0 ? r[MOV.idx.fecha] : "";
         const area = MOV.idx.area >= 0 ? r[MOV.idx.area] : "";
@@ -1027,6 +920,39 @@
         `;
         tbody.appendChild(tr);
       });
+    }
+
+    function applyFiltersAndRender() {
+      const tbody = document.getElementById("movimientosBody");
+      if (!tbody || !MOV.idx) return;
+
+      const { area, tipo, desde, hasta } = getFilters();
+      let filtered = MOV.rows.slice();
+
+      if (area !== "Todas las áreas") filtered = filtered.filter(r => (r[MOV.idx.area] || "") === area);
+      if (tipo !== "Todos") filtered = filtered.filter(r => (r[MOV.idx.tipo] || "") === tipo);
+      if (desde) filtered = filtered.filter(r => (r[MOV.idx.fecha] || "") >= desde);
+      if (hasta) filtered = filtered.filter(r => (r[MOV.idx.fecha] || "") <= hasta);
+
+      // ✅ Orden: últimos primero (asumiendo que el sheet viene en orden antiguo→nuevo)
+      const ordered = filtered.slice().reverse();
+
+      const total = ordered.length;
+      const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+      MOV_PAGE = clamp(MOV_PAGE, 1, totalPages);
+
+      const startIdx = (MOV_PAGE - 1) * PAGE_SIZE;
+      const endIdx = Math.min(startIdx + PAGE_SIZE, total);
+      const pageRows = ordered.slice(startIdx, endIdx);
+
+      // render rows
+      renderMovRowsPage(pageRows);
+
+      // info text (1-based)
+      setMovimientosInfo(total === 0 ? 0 : startIdx + 1, endIdx, total);
+
+      // pagination buttons
+      renderPaginationControls(totalPages);
     }
 
     // Helpers para pestañas por área / resumen / alertas
@@ -1253,12 +1179,6 @@
       });
     }
 
-    // ✅ helper para leer un valor del row según posibles headers del sheet
-    function getCell(row, header, names) {
-      const i = findCol(header, names);
-      return i >= 0 ? (row[i] || "") : "";
-    }
-
     function openEditModalById(id) {
       if (!id) return;
       const idx = MOV.idx;
@@ -1297,28 +1217,8 @@
       document.getElementById("mvMonto").value = Math.abs(monto);
       if (periodo) document.getElementById("mvPeriodo").value = periodo;
 
-      // ✅ cargar estado pago si viene en el sheet
       const ep = document.getElementById("mvEstadoPago");
-      if (ep) {
-        ep.value = (idx.estadoPago >= 0 ? (row[idx.estadoPago] || "") : "");
-      }
-
-      // ✅ cargar detalles adicionales si vienen en el sheet
-      const setIf = (idEl, val) => {
-        const el = document.getElementById(idEl);
-        if (el != null) el.value = val || "";
-      };
-
-      setIf("mvLocal", getCell(row, MOV.header, ["Local"]));
-      setIf("mvEmpleado", getCell(row, MOV.header, ["Empleado"]));
-      setIf("mvArrendatarioPropietario", getCell(row, MOV.header, ["Arrendatario-Propietario","Arrendatario / Propietario","ArrendatarioPropietario"]));
-      setIf("mvProveedorEmpresa", getCell(row, MOV.header, ["Proveedor - Empresa","Proveedor/Empresa","ProveedorEmpresa"]));
-      setIf("mvRut", getCell(row, MOV.header, ["RUT","Rut"]));
-      setIf("mvMetodoPago", getCell(row, MOV.header, ["Metodo de Pago","Método de pago","MetodoPago"]));
-      setIf("mvFechaVencimiento", getCell(row, MOV.header, ["Fecha Vencimiento","Fecha vencimiento","FechaVencimiento"]));
-      setIf("mvNumeroComprobante", getCell(row, MOV.header, ["Numero Comprobante","Número comprobante","NumeroComprobante"]));
-      setIf("mvConcepto", getCell(row, MOV.header, ["Concepto"]));
-      setIf("mvNotas", getCell(row, MOV.header, ["Notas","Nota"]));
+      if (ep) ep.value = (idx.estadoPago >= 0 ? (row[idx.estadoPago] || "") : "");
 
       document.getElementById('newMovementModal').classList.remove('hidden');
     }
@@ -1330,6 +1230,7 @@
         await apiFetch(`/.netlify/functions/movimientos?id=${encodeURIComponent(id)}`, { method: "DELETE" });
         alert("✅ Eliminado: " + id);
         logAction("Eliminar", `ID: ${id}`);
+        resetPagination();
         await loadMovimientos();
       } catch (e) {
         alert("❌ No pude eliminar: " + e.message);
@@ -1346,7 +1247,6 @@
       applyFiltersAndRender();
       renderAreaTabs();
 
-      // refresh current tab dependent
       if (CURRENT_TAB === "alertas") renderAlertas();
       if (CURRENT_TAB === "resumen") renderResumenMensual();
       if (CURRENT_TAB === "actividad") renderActividad();
@@ -1369,7 +1269,10 @@
 
       ["filterArea","filterTipo","filterDesde","filterHasta"].forEach(id => {
         const el = document.getElementById(id);
-        if (el) el.addEventListener("change", applyFiltersAndRender);
+        if (el) el.addEventListener("change", () => {
+          resetPagination();          // ✅ al filtrar, volver a página 1
+          applyFiltersAndRender();
+        });
       });
 
       // Edit/Delete from any tab table (delegation)
