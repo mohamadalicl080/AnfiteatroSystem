@@ -739,10 +739,23 @@
       document.getElementById('newMovementModal').classList.remove('hidden');
     }
 
-    async function apiFetch(path, options = {}) {
+    
+    // API Key (x-api-key) para acceder a Netlify Functions protegidas
+    function getApiKey() {
+      let k = (localStorage.getItem("ANFITEATRO_API_KEY") || "").trim();
+      if (!k) {
+        k = (prompt("Ingresa tu API Key para usar el sistema (x-api-key):") || "").trim();
+        if (k) localStorage.setItem("ANFITEATRO_API_KEY", k);
+      }
+      return k;
+    }
+
+async function apiFetch(path, options = {}) {
+      const apiKey = getApiKey();
+      if (!apiKey) throw new Error("Falta API Key (x-api-key). Guárdala en localStorage como ANFITEATRO_API_KEY o ingrésala cuando se solicite.");
       const res = await fetch(path, {
         ...options,
-        headers: { "Content-Type": "application/json", ...(options.headers || {}) }
+        headers: { "Content-Type": "application/json", "x-api-key": apiKey, ...(options.headers || {}) }
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || data.ok === false) throw new Error(data.error || `HTTP ${res.status}`);
@@ -1421,4 +1434,5 @@
   </script>
 </body>
 </html>
+
 

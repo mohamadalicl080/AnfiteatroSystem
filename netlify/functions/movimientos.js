@@ -20,6 +20,24 @@ function safeJsonParse(body) {
   } catch {
     return {};
   }
+
+function normalizePayload(p) {
+  const out = { ...(p || {}) };
+
+  // Compatibilidad: el front envía nombres "bonitos" (como la UI),
+  // pero la hoja espera columnas A:Y (local, arrendatario, empleado, proveedor, etc.)
+  if (out.numeroLocal != null && out.local == null) out.local = out.numeroLocal;
+  if (out.arrendatarioPropietario != null && out.arrendatario == null) out.arrendatario = out.arrendatarioPropietario;
+  if (out.nombreEmpleado != null && out.empleado == null) out.empleado = out.nombreEmpleado;
+  if (out.proveedorEmpresa != null && out.proveedor == null) out.proveedor = out.proveedorEmpresa;
+  if (out.rutIdentificacion != null && out.rut == null) out.rut = out.rutIdentificacion;
+  if (out.comprobanteBoleta != null && out.nComprobante == null) out.nComprobante = out.comprobanteBoleta;
+  if (out.conceptoCategoria != null && out.concepto == null) out.concepto = out.conceptoCategoria;
+  if (out.notasAdicionales != null && out.notas == null) out.notas = out.notasAdicionales;
+
+  return out;
+}
+
 }
 
 // Alineado a A:Y (mismo orden que tu Sheet)
@@ -118,7 +136,7 @@ exports.handler = async (event) => {
     }
 
     if (event.httpMethod === "POST") {
-      const payload = safeJsonParse(event.body);
+      const payload = normalizePayload(safeJsonParse(event.body));
 
       if (!payload.fecha || !payload.area || !payload.tipo || !payload.descripcion) {
         return withCors(json(400, {
@@ -196,7 +214,7 @@ exports.handler = async (event) => {
 
     if (event.httpMethod === "PUT") {
       const qsId = event.queryStringParameters && event.queryStringParameters.id;
-      const payload = safeJsonParse(event.body);
+      const payload = normalizePayload(safeJsonParse(event.body));
       const id = (qsId || payload.id || "").trim();
 
       if (!id) return withCors(json(400, { ok: false, error: "Falta id para editar." }));
