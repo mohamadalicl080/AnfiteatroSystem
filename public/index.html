@@ -215,14 +215,8 @@
       </div>
 
       <div class="flex justify-between items-center mt-6">
-        <p class="text-sm text-gray-600">Mostrando últimos movimientos</p>
-        <div class="flex space-x-2">
-          <button class="px-4 py-2 border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50">Anterior</button>
-          <button class="px-4 py-2 bg-purple-600 text-white rounded-lg">1</button>
-          <button class="px-4 py-2 border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50">2</button>
-          <button class="px-4 py-2 border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50">3</button>
-          <button class="px-4 py-2 border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50">Siguiente</button>
-        </div>
+        <p id="movimientosInfo" class="text-sm text-gray-600">Mostrando 0-0 de 0 movimientos</p>
+        <div id="movimientosPagination" class="flex space-x-2"></div>
       </div>
     </div>
 
@@ -622,6 +616,8 @@
   <script>
     const currentUser = { name: 'Admin', role: 'admin', email: 'admin@anfiteatro.cl' };
     const MOV = { header: [], rows: [], idx: null };
+    // Paginación (solo pestaña Movimientos)
+    const MOV_PAG = { pageSize: 5, page: 1, totalPages: 1, ordered: [] }; // ordered: últimos primero
     let EDITING_ID = null;
 
     // Tabs
@@ -764,8 +760,103 @@
       const n = Number(cleaned);
       return Number.isFinite(n) ? n : 0;
     }
+
     function setText(id, value) { const el = document.getElementById(id); if (el) el.textContent = value; }
     function monthOfFechaISO(fecha) { const m = (fecha || "").toString().match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? `${m[1]}-${m[2]}` : ""; }
+
+    // -----------------------------
+    // Paginación Movimientos
+    // -----------------------------
+    function clamp(n, min, max) { return Math.min(max, Math.max(min, n)); }
+
+    function setMovFilteredRows(filteredRows, { resetPage = true } = {}) {
+      // Orden: últimos primero (para mantener el comportamiento actual)
+      MOV_PAG.ordered = (filteredRows || []).slice().reverse();
+      if (resetPage) MOV_PAG.page = 1;
+      renderMovPage();
+    }
+
+    function renderMovPage() {
+      const total = MOV_PAG.ordered.length;
+      const totalPages = Math.max(1, Math.ceil(total / MOV_PAG.pageSize));
+      MOV_PAG.totalPages = totalPages;
+      MOV_PAG.page = clamp(MOV_PAG.page, 1, totalPages);
+
+      const startIdx = (MOV_PAG.page - 1) * MOV_PAG.pageSize;
+      const endIdx = Math.min(startIdx + MOV_PAG.pageSize, total);
+      const pageRows = MOV_PAG.ordered.slice(startIdx, endIdx);
+
+      const start = total === 0 ? 0 : (startIdx + 1);
+      const end = total === 0 ? 0 : endIdx;
+      const infoEl = document.getElementById("movimientosInfo");
+      if (infoEl) infoEl.textContent = `Mostrando ${start}-${end} de ${total} movimientos`;
+
+      renderMovRows(pageRows);
+      renderMovPagination();
+    }
+
+    function setMovPage(page) {
+      MOV_PAG.page = page;
+      renderMovPage();
+    }
+
+    function renderMovPagination() {
+      const pagEl = document.getElementById("movimientosPagination");
+      if (!pagEl) return;
+      pagEl.innerHTML = "";
+
+      const cur = MOV_PAG.page;
+      const totalPages = MOV_PAG.totalPages || 1;
+
+      function makeBtn(label, onClick, { active = false, disabled = false } = {}) {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.textContent = label;
+        b.className = active
+          ? "px-4 py-2 bg-purple-600 text-white rounded-lg"
+          : "px-4 py-2 border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50";
+        if (disabled) {
+          b.disabled = true;
+          b.classList.remove("hover:bg-gray-50");
+          b.classList.add("opacity-50", "cursor-not-allowed");
+        } else if (typeof onClick === "function") {
+          b.addEventListener("click", onClick);
+        }
+        return b;
+      }
+
+      function addEllipsis() {
+        const s = document.createElement("span");
+        s.className = "px-2 py-2 text-gray-500 select-none";
+        s.textContent = "…";
+        pagEl.appendChild(s);
+      }
+
+      // Anterior
+      pagEl.appendChild(makeBtn("Anterior", () => setMovPage(cur - 1), { disabled: cur <= 1 }));
+
+      const pages = [];
+      if (totalPages <= 7) {
+        for (let p = 1; p <= totalPages; p++) pages.push(p);
+      } else {
+        pages.push(1);
+        const left = Math.max(2, cur - 1);
+        const right = Math.min(totalPages - 1, cur + 1);
+
+        if (left > 2) pages.push("…");
+        for (let p = left; p <= right; p++) pages.push(p);
+        if (right < totalPages - 1) pages.push("…");
+        pages.push(totalPages);
+      }
+
+      pages.forEach(p => {
+        if (p === "…") return addEllipsis();
+        pagEl.appendChild(makeBtn(String(p), () => setMovPage(p), { active: p === cur }));
+      });
+
+      // Siguiente
+      pagEl.appendChild(makeBtn("Siguiente", () => setMovPage(cur + 1), { disabled: cur >= totalPages }));
+    }
 
     function buildIdx(header) {
       return {
@@ -986,7 +1077,7 @@
       if (desde) filtered = filtered.filter(r => (r[MOV.idx.fecha] || "") >= desde);
       if (hasta) filtered = filtered.filter(r => (r[MOV.idx.fecha] || "") <= hasta);
 
-      renderMovRows(filtered);
+      setMovFilteredRows(filtered, { resetPage: true });
     }
 
     function renderMovRows(rows) {
@@ -994,8 +1085,7 @@
       if (!tbody) return;
       tbody.innerHTML = "";
 
-      const lastRows = rows.slice().reverse().slice(0, 20);
-      lastRows.forEach(r => {
+      (rows || []).forEach(r => {
         const id = MOV.idx.id >= 0 ? (r[MOV.idx.id] || "") : "";
         const fecha = MOV.idx.fecha >= 0 ? r[MOV.idx.fecha] : "";
         const area = MOV.idx.area >= 0 ? r[MOV.idx.area] : "";
