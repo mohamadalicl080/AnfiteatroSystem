@@ -518,29 +518,6 @@
           </select>
         </div>
 
-        <!-- ✅ Detalles adicionales (VOLVIERON) -->
-        <div class="border border-gray-200 rounded-xl p-4 bg-gray-50">
-          <label class="flex items-center gap-3 cursor-pointer select-none">
-            <input id="mvDetallesToggle" type="checkbox" class="h-4 w-4 accent-purple-600">
-            <span class="text-sm font-semibold text-gray-800">
-              Agregar detalles adicionales
-              <span class="text-xs font-normal text-gray-500 ml-2">(opcional)</span>
-            </span>
-          </label>
-
-          <div id="mvDetallesWrap" class="hidden mt-4 space-y-3">
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-2">Detalles adicionales</label>
-              <textarea id="mvDetallesAdicionales" rows="3"
-                placeholder="Ej: N° factura 123, proveedor X, observaciones, referencia, etc."
-                class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition duration-200"></textarea>
-              <p class="text-xs text-gray-500 mt-2">
-                *Se guarda junto al movimiento y se carga automáticamente al editar.
-              </p>
-            </div>
-          </div>
-        </div>
-
         <div class="bg-purple-50 border border-purple-200 rounded-lg p-4">
           <div class="flex items-center space-x-2">
             <i class="fas fa-user-check text-purple-600"></i>
@@ -566,7 +543,7 @@
     let EDITING_ID = null;
 
     // ✅ Pagination (REAL)
-    const PAGE_SIZE = 5;
+    const PAGE_SIZE = 5;          // para que se vea como "Mostrando 1-5 de ..."
     let MOV_PAGE = 1;
     function clamp(n, min, max) { return Math.max(min, Math.min(max, n)); }
     function resetPagination() { MOV_PAGE = 1; }
@@ -616,13 +593,16 @@
       const safeTab = TAB_IDS.includes(tabName) ? tabName : "movimientos";
       CURRENT_TAB = safeTab;
 
+      // hide all
       TAB_IDS.forEach(t => {
         const el = document.getElementById(`${t}-tab`);
         if (el) el.classList.add("hidden");
       });
 
+      // show selected
       document.getElementById(`${safeTab}-tab`)?.classList.remove("hidden");
 
+      // active styles on tabs
       document.querySelectorAll(".tabs-btn").forEach(b => {
         b.classList.remove("tab-active");
         b.classList.add("text-gray-600");
@@ -634,6 +614,7 @@
         btn.classList.remove("text-gray-600");
       }
 
+      // refresh dependent tabs
       if (["gastos","arriendos","proveedores","empleados","caja-chica","otros"].includes(safeTab)) {
         renderAreaTabs();
       }
@@ -642,26 +623,13 @@
       if (safeTab === "actividad") renderActividad();
     }
 
-    // ✅ helpers para detalles adicionales
-    function setDetallesVisible(visible) {
-      const wrap = document.getElementById("mvDetallesWrap");
-      if (!wrap) return;
-      wrap.classList.toggle("hidden", !visible);
-    }
-    function initDetallesToggle() {
-      const t = document.getElementById("mvDetallesToggle");
-      if (!t) return;
-      t.addEventListener("change", () => {
-        setDetallesVisible(!!t.checked);
-      });
-    }
-
     function openNewMovementModal() {
       EDITING_ID = null;
       document.getElementById('modalTitle').textContent = 'Nuevo Movimiento';
       document.getElementById('modalSubmitText').textContent = 'Guardar Movimiento';
       document.getElementById('movementForm')?.reset();
 
+      // defaults hoy / mes
       const d = new Date();
       const iso = d.toISOString().slice(0,10);
       const ym = iso.slice(0,7);
@@ -670,15 +638,9 @@
       const pEl = document.getElementById('mvPeriodo');
       if (pEl) pEl.value = ym;
 
+      // default estado pago vacío
       const ep = document.getElementById("mvEstadoPago");
       if (ep) ep.value = "";
-
-      // ✅ reset detalles adicionales
-      const dt = document.getElementById("mvDetallesToggle");
-      const da = document.getElementById("mvDetallesAdicionales");
-      if (dt) dt.checked = false;
-      if (da) da.value = "";
-      setDetallesVisible(false);
 
       document.getElementById('newMovementModal').classList.remove('hidden');
     }
@@ -730,8 +692,6 @@
         responsable: findCol(header, ["Responsable"]),
         periodo: findCol(header, ["Periodo", "Período"]),
         estadoPago: findCol(header, ["EstadoPago","Estado Pago","Estado de Pago","Estado"]),
-        // ✅ NUEVO: detalles adicionales
-        detallesAdicionales: findCol(header, ["DetallesAdicionales","Detalles Adicionales","Detalles","Detalle","Observaciones","Notas"]),
       };
     }
 
@@ -802,12 +762,6 @@
       const periodo = document.getElementById("mvPeriodo")?.value?.trim() || "";
       const estadoPago = document.getElementById("mvEstadoPago")?.value?.trim() || "";
 
-      // ✅ Detalles adicionales (toggle)
-      const detallesToggle = document.getElementById("mvDetallesToggle")?.checked || false;
-      const detallesAdicionales = detallesToggle
-        ? (document.getElementById("mvDetallesAdicionales")?.value?.trim() || "")
-        : "";
-
       const AREA_MAP = {
         "gastos-comunes": "Gastos Comunes",
         "arriendos": "Arriendos",
@@ -827,9 +781,7 @@
         fecha, area, tipo, descripcion, monto,
         responsable: currentUser?.name || "Admin",
         periodo,
-        estadoPago,
-        // ✅ NUEVO
-        detallesAdicionales
+        estadoPago
       };
     }
 
@@ -845,20 +797,14 @@
             body: JSON.stringify(payload)
           });
           alert(`✅ Movimiento editado!\nID: ${result.id || EDITING_ID}`);
-          logAction(
-            "Editar",
-            `${payload.area} · ${payload.tipo} · ${formatCLP(payload.monto)} · ${payload.descripcion} · ${payload.estadoPago || "Sin estado"}${payload.detallesAdicionales ? " · Detalles: " + payload.detallesAdicionales : ""}`
-          );
+          logAction("Editar", `${payload.area} · ${payload.tipo} · ${formatCLP(payload.monto)} · ${payload.descripcion} · ${payload.estadoPago || "Sin estado"}`);
         } else {
           const result = await apiFetch("/.netlify/functions/movimientos", {
             method: "POST",
             body: JSON.stringify(payload)
           });
           alert(`✅ Movimiento guardado!\nID: ${result.id}`);
-          logAction(
-            "Crear",
-            `${payload.area} · ${payload.tipo} · ${formatCLP(payload.monto)} · ${payload.descripcion} · ${payload.estadoPago || "Sin estado"}${payload.detallesAdicionales ? " · Detalles: " + payload.detallesAdicionales : ""}`
-          );
+          logAction("Crear", `${payload.area} · ${payload.tipo} · ${formatCLP(payload.monto)} · ${payload.descripcion} · ${payload.estadoPago || "Sin estado"}`);
         }
 
         closeModal();
@@ -879,6 +825,7 @@
       };
     }
 
+    // ✅ UI pagination helpers
     function setMovimientosInfo(start, end, total) {
       const info = document.getElementById("movimientosInfo");
       if (!info) return;
@@ -891,6 +838,7 @@
       if (!container) return;
       container.innerHTML = "";
 
+      // nothing to paginate
       if (totalPages <= 1) return;
 
       const btnBase = "px-4 py-2 border rounded-lg text-gray-700 hover:bg-gray-50 transition";
@@ -911,10 +859,12 @@
         return b;
       };
 
+      // Prev
       container.appendChild(
         makeBtn("Anterior", () => { MOV_PAGE = clamp(MOV_PAGE - 1, 1, totalPages); applyFiltersAndRender(); }, MOV_PAGE === 1)
       );
 
+      // page numbers (window)
       const windowSize = 5;
       let start = Math.max(1, MOV_PAGE - Math.floor(windowSize/2));
       let end = Math.min(totalPages, start + windowSize - 1);
@@ -926,11 +876,13 @@
         );
       }
 
+      // Next
       container.appendChild(
         makeBtn("Siguiente", () => { MOV_PAGE = clamp(MOV_PAGE + 1, 1, totalPages); applyFiltersAndRender(); }, MOV_PAGE === totalPages)
       );
     }
 
+    // ✅ Movimientos main render (no reverse inside)
     function renderMovRowsPage(rows) {
       const tbody = document.getElementById("movimientosBody");
       if (!tbody) return;
@@ -982,6 +934,7 @@
       if (desde) filtered = filtered.filter(r => (r[MOV.idx.fecha] || "") >= desde);
       if (hasta) filtered = filtered.filter(r => (r[MOV.idx.fecha] || "") <= hasta);
 
+      // ✅ Orden: últimos primero (asumiendo que el sheet viene en orden antiguo→nuevo)
       const ordered = filtered.slice().reverse();
 
       const total = ordered.length;
@@ -992,11 +945,17 @@
       const endIdx = Math.min(startIdx + PAGE_SIZE, total);
       const pageRows = ordered.slice(startIdx, endIdx);
 
+      // render rows
       renderMovRowsPage(pageRows);
+
+      // info text (1-based)
       setMovimientosInfo(total === 0 ? 0 : startIdx + 1, endIdx, total);
+
+      // pagination buttons
       renderPaginationControls(totalPages);
     }
 
+    // Helpers para pestañas por área / resumen / alertas
     function signedAmount(tipo, monto) {
       const t = (tipo || "").toString().trim();
       const m = Math.abs(Number(monto) || 0);
@@ -1261,15 +1220,6 @@
       const ep = document.getElementById("mvEstadoPago");
       if (ep) ep.value = (idx.estadoPago >= 0 ? (row[idx.estadoPago] || "") : "");
 
-      // ✅ cargar detalles adicionales si existen
-      const dt = document.getElementById("mvDetallesToggle");
-      const da = document.getElementById("mvDetallesAdicionales");
-      const detallesVal = (idx.detallesAdicionales >= 0 ? (row[idx.detallesAdicionales] || "") : "");
-      const hasDetalles = !!(detallesVal && detallesVal.toString().trim());
-      if (dt) dt.checked = hasDetalles;
-      if (da) da.value = hasDetalles ? detallesVal : "";
-      setDetallesVisible(hasDetalles);
-
       document.getElementById('newMovementModal').classList.remove('hidden');
     }
 
@@ -1303,17 +1253,16 @@
     }
 
     document.addEventListener("DOMContentLoaded", () => {
+      // Tabs click
       document.querySelectorAll(".tabs-btn[data-tab]").forEach(btn => {
         btn.addEventListener("click", () => {
           showTab(btn.dataset.tab, btn);
         });
       });
 
+      // initial tab
       const firstTabBtn = document.querySelector('.tabs-btn[data-tab="movimientos"]');
       showTab("movimientos", firstTabBtn);
-
-      // ✅ init toggle detalles adicionales
-      initDetallesToggle();
 
       document.getElementById("movementForm")?.addEventListener("submit", saveMovement);
       loadMovimientos().catch(console.error);
@@ -1321,11 +1270,12 @@
       ["filterArea","filterTipo","filterDesde","filterHasta"].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.addEventListener("change", () => {
-          resetPagination();
+          resetPagination();          // ✅ al filtrar, volver a página 1
           applyFiltersAndRender();
         });
       });
 
+      // Edit/Delete from any tab table (delegation)
       document.body.addEventListener("click", (e) => {
         const btn = e.target.closest("button[data-action]");
         if (!btn) return;
@@ -1335,6 +1285,7 @@
         if (action === "delete") deleteMovimientoById(id);
       });
 
+      // Export
       const exportButton = document.getElementById("exportButton");
       if (exportButton) {
         if (currentUser.role !== "admin") {
@@ -1345,6 +1296,7 @@
         }
       }
 
+      // Close modal on overlay click
       const modal = document.getElementById('newMovementModal');
       if (modal) modal.addEventListener('click', function(e) { if (e.target === this) closeModal(); });
     });
