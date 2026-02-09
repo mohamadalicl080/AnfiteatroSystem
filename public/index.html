@@ -214,13 +214,19 @@
         </table>
       </div>
 
-      <div class="flex flex-col md:flex-row md:justify-between md:items-center gap-3 mt-6">
-        <p id="movimientosInfo" class="text-sm text-gray-600">Mostrando 0-0 de 0 movimientos</p>
-        <div id="paginationControls" class="flex flex-wrap gap-2 justify-end"></div>
+      <div class="flex justify-between items-center mt-6">
+        <p class="text-sm text-gray-600">Mostrando últimos movimientos</p>
+        <div class="flex space-x-2">
+          <button class="px-4 py-2 border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50">Anterior</button>
+          <button class="px-4 py-2 bg-purple-600 text-white rounded-lg">1</button>
+          <button class="px-4 py-2 border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50">2</button>
+          <button class="px-4 py-2 border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50">3</button>
+          <button class="px-4 py-2 border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50">Siguiente</button>
+        </div>
       </div>
     </div>
 
-    <!-- (tabs restantes sin cambios, los dejé igual a tu base) -->
+    <!-- Gastos -->
     <div id="gastos-tab" class="hidden bg-white rounded-b-xl shadow-lg p-6">
       <div class="flex justify-between items-center mb-4">
         <h2 class="text-2xl font-bold text-gray-800"><i class="fas fa-receipt mr-2 text-purple-600"></i>Gastos Comunes</h2>
@@ -243,6 +249,7 @@
       </div>
     </div>
 
+    <!-- Arriendos -->
     <div id="arriendos-tab" class="hidden bg-white rounded-b-xl shadow-lg p-6">
       <div class="flex justify-between items-center mb-4">
         <h2 class="text-2xl font-bold text-gray-800"><i class="fas fa-home mr-2 text-purple-600"></i>Arriendos</h2>
@@ -265,6 +272,7 @@
       </div>
     </div>
 
+    <!-- Proveedores -->
     <div id="proveedores-tab" class="hidden bg-white rounded-b-xl shadow-lg p-6">
       <div class="flex justify-between items-center mb-4">
         <h2 class="text-2xl font-bold text-gray-800"><i class="fas fa-tools mr-2 text-purple-600"></i>Proveedores</h2>
@@ -287,6 +295,7 @@
       </div>
     </div>
 
+    <!-- Empleados -->
     <div id="empleados-tab" class="hidden bg-white rounded-b-xl shadow-lg p-6">
       <div class="flex justify-between items-center mb-4">
         <h2 class="text-2xl font-bold text-gray-800"><i class="fas fa-users mr-2 text-purple-600"></i>Empleados</h2>
@@ -309,6 +318,7 @@
       </div>
     </div>
 
+    <!-- Caja chica -->
     <div id="caja-chica-tab" class="hidden bg-white rounded-b-xl shadow-lg p-6">
       <div class="flex justify-between items-center mb-4">
         <h2 class="text-2xl font-bold text-gray-800"><i class="fas fa-wallet mr-2 text-purple-600"></i>Caja Chica</h2>
@@ -331,6 +341,7 @@
       </div>
     </div>
 
+    <!-- Otros -->
     <div id="otros-tab" class="hidden bg-white rounded-b-xl shadow-lg p-6">
       <div class="flex justify-between items-center mb-4">
         <h2 class="text-2xl font-bold text-gray-800"><i class="fas fa-folder mr-2 text-purple-600"></i>Otros</h2>
@@ -353,6 +364,7 @@
       </div>
     </div>
 
+    <!-- Alertas -->
     <div id="alertas-tab" class="hidden bg-white rounded-b-xl shadow-lg p-6">
       <div class="flex justify-between items-center mb-4">
         <h2 class="text-2xl font-bold text-gray-800"><i class="fas fa-bell mr-2 text-purple-600"></i>Alertas</h2>
@@ -362,6 +374,7 @@
       <p class="text-xs text-gray-400 mt-4">*Las alertas se generan desde Movimientos (morosos/pendientes y egresos altos).</p>
     </div>
 
+    <!-- Resumen -->
     <div id="resumen-tab" class="hidden bg-white rounded-b-xl shadow-lg p-6">
       <div class="flex justify-between items-center mb-4">
         <h2 class="text-2xl font-bold text-gray-800"><i class="fas fa-chart-pie mr-2 text-purple-600"></i>Resumen Mensual</h2>
@@ -399,6 +412,7 @@
       </div>
     </div>
 
+    <!-- Actividad -->
     <div id="actividad-tab" class="hidden bg-white rounded-b-xl shadow-lg p-6">
       <div class="flex justify-between items-center mb-4">
         <h2 class="text-2xl font-bold text-gray-800"><i class="fas fa-history mr-2 text-purple-600"></i>Registro Actividad</h2>
@@ -421,7 +435,7 @@
       <p class="text-xs text-gray-400 mt-4">*En esta demo se registra en memoria (se reinicia al recargar).</p>
     </div>
 
-  </div>
+  </div> <!-- /container -->
 
   <!-- Modal -->
   <div id="newMovementModal" class="hidden fixed inset-0 bg-black bg-opacity-50 modal-overlay flex items-center justify-center z-50">
@@ -439,7 +453,7 @@
       <form class="p-6 space-y-4" id="movementForm">
         <div>
           <label class="block text-sm font-semibold text-gray-700 mb-2"><i class="fas fa-calendar text-purple-600 mr-2"></i>Fecha del Movimiento</label>
-          <input id="mvFecha" type="date" class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition duration-200" required>
+          <input id="mvFecha" type="date" value="2026-02-06" class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition duration-200" required>
         </div>
 
         <div>
@@ -492,153 +506,97 @@
           <textarea id="mvDescripcion" rows="3" placeholder="Ej: Pago arriendo Local 12 - Febrero 2026" class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition duration-200" required></textarea>
         </div>
 
-        <!-- ✅ DETALLES ADICIONALES (como la foto) -->
-        <div class="border border-gray-200 rounded-xl p-5 bg-gray-50">
-          <div class="flex items-center gap-2 mb-4">
-            <i class="fas fa-circle-info text-purple-600"></i>
-            <h4 class="font-semibold text-gray-800">Detalles Adicionales</h4>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">📅 Período Correspondiente</label>
+          <input id="mvPeriodo" type="month" value="2026-02" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+        </div>
+
+        <!-- ✅ Estado de Pago -->
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-2">Estado de Pago</label>
+          <select id="mvEstadoPago" class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition duration-200">
+            <option value="">Seleccione...</option>
+            <option>Pendiente</option>
+            <option>Pagado</option>
+            <option>Atrasado</option>
+            <option>Anulado</option>
+          </select>
+        </div>
+
+        <!-- ✅ Detalles adicionales (RESTAURADO) -->
+        <div class="pt-2">
+          <h4 class="text-sm font-bold text-gray-700 flex items-center gap-2">
+            <i class="fas fa-clipboard-list text-purple-600"></i>Detalles adicionales
+          </h4>
+          <p class="text-xs text-gray-500 mt-1">Completa solo lo que aplique (según el tipo de movimiento).</p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-2">Local</label>
+            <input id="mvLocal" type="text" placeholder="Ej: Local 12"
+              class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition duration-200">
           </div>
 
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <!-- Número de Local -->
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-2">
-                <i class="fas fa-store text-purple-600 mr-2"></i>Número de Local
-              </label>
-              <select id="mvNumeroLocal" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
-                <option value="">Seleccionar local...</option>
-                <option>Local 1</option>
-                <option>Local 2</option>
-                <option>Local 3</option>
-                <option>Local 4</option>
-                <option>Local 5</option>
-              </select>
-            </div>
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-2">Empleado</label>
+            <input id="mvEmpleado" type="text" placeholder="Ej: Juan Pérez"
+              class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition duration-200">
+          </div>
 
-            <!-- Arrendatario/Propietario -->
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-2">
-                <i class="fas fa-user text-purple-600 mr-2"></i>Arrendatario/Propietario
-              </label>
-              <input id="mvArrendatarioPropietario" type="text" placeholder="Ej: Juan Pérez"
-                class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
-            </div>
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-2">Arrendatario / Propietario</label>
+            <input id="mvArrendatarioPropietario" type="text" placeholder="Ej: Pedro Soto / Inmobiliaria X"
+              class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition duration-200">
+          </div>
 
-            <!-- Nombre Empleado -->
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-2">
-                <i class="fas fa-id-badge text-purple-600 mr-2"></i>Nombre Empleado
-              </label>
-              <select id="mvNombreEmpleado" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
-                <option value="">No aplica / Seleccionar...</option>
-                <option>María González</option>
-                <option>Pedro Ramírez</option>
-                <option>Camila Rojas</option>
-              </select>
-            </div>
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-2">Proveedor / Empresa</label>
+            <input id="mvProveedorEmpresa" type="text" placeholder="Ej: Chilectra / Proveedor ABC"
+              class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition duration-200">
+          </div>
 
-            <!-- Proveedor/Empresa -->
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-2">
-                <i class="fas fa-building text-purple-600 mr-2"></i>Proveedor/Empresa
-              </label>
-              <input id="mvProveedorEmpresa" type="text" placeholder="Ej: Empresa de Limpieza S.A."
-                class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
-            </div>
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-2">RUT</label>
+            <input id="mvRut" type="text" placeholder="Ej: 12.345.678-9"
+              class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition duration-200">
+          </div>
 
-            <!-- RUT/Identificación -->
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-2">
-                <i class="fas fa-id-card text-purple-600 mr-2"></i>RUT/Identificación
-              </label>
-              <input id="mvRutIdentificacion" type="text" placeholder="Ej: 12.345.678-9"
-                class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
-            </div>
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-2">Método de pago</label>
+            <select id="mvMetodoPago"
+              class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition duration-200">
+              <option value="">Seleccione...</option>
+              <option>Efectivo</option>
+              <option>Transferencia</option>
+              <option>Tarjeta</option>
+              <option>Cheque</option>
+              <option>Otro</option>
+            </select>
+          </div>
 
-            <!-- Método de Pago -->
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-2">
-                <i class="fas fa-credit-card text-purple-600 mr-2"></i>Método de Pago
-              </label>
-              <select id="mvMetodoPago" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
-                <option value="">Seleccionar método...</option>
-                <option>Transferencia</option>
-                <option>Efectivo</option>
-                <option>Tarjeta</option>
-                <option>Cheque</option>
-                <option>Otro</option>
-              </select>
-            </div>
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-2">Fecha vencimiento</label>
+            <input id="mvFechaVencimiento" type="date"
+              class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition duration-200">
+          </div>
 
-            <!-- N° Comprobante/Boleta -->
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-2">
-                <i class="fas fa-receipt text-purple-600 mr-2"></i>N° Comprobante/Boleta
-              </label>
-              <input id="mvComprobanteBoleta" type="text" placeholder="Ej: 00123456"
-                class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
-            </div>
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-2">Número comprobante</label>
+            <input id="mvNumeroComprobante" type="text" placeholder="Ej: 000123"
+              class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition duration-200">
+          </div>
 
-            <!-- Fecha Vencimiento -->
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-2">
-                <i class="fas fa-clock text-purple-600 mr-2"></i>Fecha Vencimiento
-              </label>
-              <input id="mvFechaVencimiento" type="date"
-                class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
-            </div>
+          <div class="md:col-span-2">
+            <label class="block text-sm font-semibold text-gray-700 mb-2">Concepto</label>
+            <input id="mvConcepto" type="text" placeholder="Ej: Arriendo / Luz / Sueldo / Mantención"
+              class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition duration-200">
+          </div>
 
-            <!-- Estado de Pago -->
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-2">
-                <i class="fas fa-square-check text-green-600 mr-2"></i>Estado de Pago
-              </label>
-              <select id="mvEstadoPago" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
-                <option value="">Seleccione...</option>
-                <option>Pendiente</option>
-                <option>Pagado</option>
-                <option>Atrasado</option>
-                <option>Anulado</option>
-              </select>
-            </div>
-
-            <!-- Concepto/Categoría -->
-            <div>
-              <label class="block text-sm font-medium text-gray-700 mb-2">
-                <i class="fas fa-tag text-purple-600 mr-2"></i>Concepto/Categoría
-              </label>
-              <select id="mvConceptoCategoria" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
-                <option>Sin especificar</option>
-                <option>Arriendo</option>
-                <option>Servicios básicos</option>
-                <option>Limpieza</option>
-                <option>Mantención</option>
-                <option>Sueldos</option>
-                <option>Reparación</option>
-                <option>Otros</option>
-              </select>
-            </div>
-
-            <!-- Período Correspondiente (como la foto: dentro del bloque) -->
-            <div class="md:col-span-1">
-              <label class="block text-sm font-medium text-gray-700 mb-2">
-                <i class="fas fa-calendar-alt text-purple-600 mr-2"></i>Período Correspondiente
-              </label>
-              <input id="mvPeriodo" type="month"
-                class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
-            </div>
-
-            <!-- Espacio (para mantener estética en md) -->
-            <div class="hidden md:block"></div>
-
-            <!-- Notas Adicionales (full width) -->
-            <div class="md:col-span-2">
-              <label class="block text-sm font-medium text-gray-700 mb-2">
-                <i class="fas fa-pen-to-square text-purple-600 mr-2"></i>Notas Adicionales
-              </label>
-              <textarea id="mvNotasAdicionales" rows="3" placeholder="Información adicional relevante..."
-                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"></textarea>
-            </div>
+          <div class="md:col-span-2">
+            <label class="block text-sm font-semibold text-gray-700 mb-2">Notas</label>
+            <textarea id="mvNotas" rows="3" placeholder="Observaciones internas..."
+              class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition duration-200"></textarea>
           </div>
         </div>
 
@@ -666,18 +624,24 @@
     const MOV = { header: [], rows: [], idx: null };
     let EDITING_ID = null;
 
-    const PAGE_SIZE = 5;
-    let MOV_PAGE = 1;
-    function clamp(n, min, max) { return Math.max(min, Math.min(max, n)); }
-    function resetPagination() { MOV_PAGE = 1; }
-
-    const TAB_IDS = ["movimientos","gastos","arriendos","proveedores","empleados","caja-chica","otros","alertas","resumen","actividad"];
+    // Tabs
+    const TAB_IDS = [
+      "movimientos","gastos","arriendos","proveedores","empleados",
+      "caja-chica","otros","alertas","resumen","actividad"
+    ];
     let CURRENT_TAB = "movimientos";
 
-    const ACT_LOG = [];
+    // Actividad (log local)
+    const ACT_LOG = []; // {ts,user,action,detail}
+
     function logAction(action, detail) {
       const ts = new Date().toISOString();
-      ACT_LOG.unshift({ ts, user: currentUser?.name || "Admin", action, detail: detail || "" });
+      ACT_LOG.unshift({
+        ts,
+        user: currentUser?.name || "Admin",
+        action,
+        detail: detail || ""
+      });
       if (ACT_LOG.length > 200) ACT_LOG.length = 200;
       renderActividad();
     }
@@ -705,20 +669,35 @@
       const safeTab = TAB_IDS.includes(tabName) ? tabName : "movimientos";
       CURRENT_TAB = safeTab;
 
-      TAB_IDS.forEach(t => document.getElementById(`${t}-tab`)?.classList.add("hidden"));
+      // hide all
+      TAB_IDS.forEach(t => {
+        const el = document.getElementById(`${t}-tab`);
+        if (el) el.classList.add("hidden");
+      });
+
+      // show selected
       document.getElementById(`${safeTab}-tab`)?.classList.remove("hidden");
 
-      document.querySelectorAll(".tabs-btn").forEach(b => { b.classList.remove("tab-active"); b.classList.add("text-gray-600"); });
-      const btn = (evOrBtn && evOrBtn.target) ? evOrBtn.target.closest("button") : evOrBtn;
-      if (btn) { btn.classList.add("tab-active"); btn.classList.remove("text-gray-600"); }
+      // active styles on tabs
+      document.querySelectorAll(".tabs-btn").forEach(b => {
+        b.classList.remove("tab-active");
+        b.classList.add("text-gray-600");
+      });
 
-      if (["gastos","arriendos","proveedores","empleados","caja-chica","otros"].includes(safeTab)) renderAreaTabs();
+      const btn = (evOrBtn && evOrBtn.target) ? evOrBtn.target.closest("button") : evOrBtn;
+      if (btn) {
+        btn.classList.add("tab-active");
+        btn.classList.remove("text-gray-600");
+      }
+
+      // refresh dependent tabs
+      if (["gastos","arriendos","proveedores","empleados","caja-chica","otros"].includes(safeTab)) {
+        renderAreaTabs();
+      }
       if (safeTab === "alertas") renderAlertas();
       if (safeTab === "resumen") renderResumenMensual();
       if (safeTab === "actividad") renderActividad();
     }
-
-    function closeModal() { document.getElementById('newMovementModal').classList.add('hidden'); }
 
     function openNewMovementModal() {
       EDITING_ID = null;
@@ -726,36 +705,37 @@
       document.getElementById('modalSubmitText').textContent = 'Guardar Movimiento';
       document.getElementById('movementForm')?.reset();
 
+      // defaults hoy / mes
       const d = new Date();
       const iso = d.toISOString().slice(0,10);
       const ym = iso.slice(0,7);
-      document.getElementById('mvFecha').value = iso;
-      document.getElementById('mvPeriodo').value = ym;
+      const fEl = document.getElementById('mvFecha');
+      if (fEl) fEl.value = iso;
+      const pEl = document.getElementById('mvPeriodo');
+      if (pEl) pEl.value = ym;
 
-      // defaults
-      document.getElementById("mvEstadoPago").value = "";
-      document.getElementById("mvConceptoCategoria").value = "Sin especificar";
+      // ✅ default estado pago vacío
+      const ep = document.getElementById("mvEstadoPago");
+      if (ep) ep.value = "";
+
+      // ✅ limpiar detalles adicionales
+      const extraIds = [
+        "mvLocal","mvEmpleado","mvArrendatarioPropietario","mvProveedorEmpresa","mvRut",
+        "mvMetodoPago","mvFechaVencimiento","mvNumeroComprobante","mvConcepto","mvNotas"
+      ];
+      extraIds.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = "";
+      });
 
       document.getElementById('newMovementModal').classList.remove('hidden');
     }
+    function closeModal() { document.getElementById('newMovementModal').classList.add('hidden'); }
 
-    
-    // API Key (x-api-key) para acceder a Netlify Functions protegidas
-    function getApiKey() {
-      let k = (localStorage.getItem("ANFITEATRO_API_KEY") || "").trim();
-      if (!k) {
-        k = (prompt("Ingresa tu API Key para usar el sistema (x-api-key):") || "").trim();
-        if (k) localStorage.setItem("ANFITEATRO_API_KEY", k);
-      }
-      return k;
-    }
-
-async function apiFetch(path, options = {}) {
-      const apiKey = getApiKey();
-      if (!apiKey) throw new Error("Falta API Key (x-api-key). Guárdala en localStorage como ANFITEATRO_API_KEY o ingrésala cuando se solicite.");
+    async function apiFetch(path, options = {}) {
       const res = await fetch(path, {
         ...options,
-        headers: { "Content-Type": "application/json", "x-api-key": apiKey, ...(options.headers || {}) }
+        headers: { "Content-Type": "application/json", ...(options.headers || {}) }
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || data.ok === false) throw new Error(data.error || `HTTP ${res.status}`);
@@ -796,20 +776,20 @@ async function apiFetch(path, options = {}) {
         descripcion: findCol(header, ["Descripción", "Descripcion"]),
         monto: findCol(header, ["Monto", "MontoAsignado", "Monto Asignado", "Monto_Signado", "Monto Signado", "Monto_Asignado"]),
         responsable: findCol(header, ["Responsable"]),
-        periodo: findCol(header, ["Periodo", "Período", "Período Correspondiente", "Periodo Correspondiente"]),
+        periodo: findCol(header, ["Periodo", "Período"]),
+        // ✅ Estado de Pago
         estadoPago: findCol(header, ["EstadoPago","Estado Pago","Estado de Pago","Estado"]),
-
-        // ✅ Nuevos campos Detalles Adicionales (con varios alias por si cambian títulos en sheet)
-        numeroLocal: findCol(header, ["Número de Local","Numero de Local","N° Local","Nro Local","Local"]),
-        arrendatarioPropietario: findCol(header, ["Arrendatario/Propietario","Arrendatario","Propietario"]),
-        nombreEmpleado: findCol(header, ["Nombre Empleado","Empleado","Nombre del Empleado"]),
-        proveedorEmpresa: findCol(header, ["Proveedor/Empresa","Proveedor","Empresa"]),
-        rutIdentificacion: findCol(header, ["RUT/Identificación","RUT","Rut","Identificación","Identificacion"]),
-        metodoPago: findCol(header, ["Método de Pago","Metodo de Pago","Medio de Pago","Forma de Pago"]),
-        comprobanteBoleta: findCol(header, ["N° Comprobante/Boleta","Nro Comprobante/Boleta","Comprobante","Boleta","N° Comprobante","Nro Comprobante"]),
-        fechaVencimiento: findCol(header, ["Fecha Vencimiento","Vencimiento","Fecha de Vencimiento"]),
-        conceptoCategoria: findCol(header, ["Concepto/Categoría","Concepto","Categoría","Categoria"]),
-        notasAdicionales: findCol(header, ["Notas Adicionales","Notas","Observaciones","Detalle Adicional","Detalles Adicionales"])
+        // ✅ Detalles adicionales (opcional, pero útil para editar/leer desde Sheet)
+        local: findCol(header, ["Local"]),
+        empleado: findCol(header, ["Empleado"]),
+        arrendatarioPropietario: findCol(header, ["Arrendatario-Propietario","Arrendatario / Propietario","ArrendatarioPropietario"]),
+        proveedorEmpresa: findCol(header, ["Proveedor - Empresa","Proveedor/Empresa","ProveedorEmpresa"]),
+        rut: findCol(header, ["RUT","Rut"]),
+        metodoPago: findCol(header, ["Metodo de Pago","Método de pago","MetodoPago"]),
+        fechaVencimiento: findCol(header, ["Fecha Vencimiento","Fecha vencimiento","FechaVencimiento"]),
+        numeroComprobante: findCol(header, ["Numero Comprobante","Número comprobante","NumeroComprobante"]),
+        concepto: findCol(header, ["Concepto"]),
+        notas: findCol(header, ["Notas","Nota"]),
       };
     }
 
@@ -860,16 +840,22 @@ async function apiFetch(path, options = {}) {
       return { ingresosMes, egresosMes, ingresosTotal, egresosTotal, balanceTotal: ingresosTotal-egresosTotal, morosos, cajaChica };
     }
 
-    function updateCards(header, rows) {
-      const s = calcStatsFromMovs(header, rows);
-      setText("cardIngresosMes", formatCLP(s.ingresosMes));
-      setText("cardEgresosMes", formatCLP(s.egresosMes));
-      setText("cardIngresosTotal", formatCLP(s.ingresosTotal));
-      setText("cardEgresosTotal", formatCLP(s.egresosTotal));
-      setText("cardBalanceTotal", formatCLP(s.balanceTotal));
-      setText("cardMorosos", String(s.morosos));
-      setText("cardCajaChica", formatCLP(s.cajaChica));
-    }
+ function updateCards(header, rows) {
+  const s = calcStatsFromMovs(header, rows);
+
+  setText("cardIngresosMes", formatCLP(s.ingresosMes));
+  setText("cardEgresosMes", formatCLP(s.egresosMes));
+  setText("cardIngresosTotal", formatCLP(s.ingresosTotal));
+  setText("cardEgresosTotal", formatCLP(s.egresosTotal));
+
+  // ✅ FIX: balance correcto = ingresos - egresos
+  const balanceTotal = (Number(s.ingresosTotal) || 0) - (Number(s.egresosTotal) || 0);
+  setText("cardBalanceTotal", formatCLP(balanceTotal));
+
+  setText("cardMorosos", String(s.morosos));
+  setText("cardCajaChica", formatCLP(s.cajaChica));
+}
+
 
     function readModalFields() {
       const fecha = document.getElementById("mvFecha")?.value?.trim() || "";
@@ -877,20 +863,22 @@ async function apiFetch(path, options = {}) {
       const tipoRaw = document.querySelector('#movementForm input[name="tipo"]:checked')?.value?.trim() || "";
       const descripcion = document.getElementById("mvDescripcion")?.value?.trim() || "";
       const monto = Number(document.getElementById("mvMonto")?.value || 0) || 0;
-
-      // ✅ Detalles adicionales
-      const numeroLocal = document.getElementById("mvNumeroLocal")?.value?.trim() || "";
-      const arrendatarioPropietario = document.getElementById("mvArrendatarioPropietario")?.value?.trim() || "";
-      const nombreEmpleado = document.getElementById("mvNombreEmpleado")?.value?.trim() || "";
-      const proveedorEmpresa = document.getElementById("mvProveedorEmpresa")?.value?.trim() || "";
-      const rutIdentificacion = document.getElementById("mvRutIdentificacion")?.value?.trim() || "";
-      const metodoPago = document.getElementById("mvMetodoPago")?.value?.trim() || "";
-      const comprobanteBoleta = document.getElementById("mvComprobanteBoleta")?.value?.trim() || "";
-      const fechaVencimiento = document.getElementById("mvFechaVencimiento")?.value?.trim() || "";
-      const estadoPago = document.getElementById("mvEstadoPago")?.value?.trim() || "";
-      const conceptoCategoria = document.getElementById("mvConceptoCategoria")?.value?.trim() || "Sin especificar";
       const periodo = document.getElementById("mvPeriodo")?.value?.trim() || "";
-      const notasAdicionales = document.getElementById("mvNotasAdicionales")?.value?.trim() || "";
+
+      // ✅ Estado de Pago
+      const estadoPago = document.getElementById("mvEstadoPago")?.value?.trim() || "";
+
+      // ✅ Detalles adicionales (restaurados)
+      const local = document.getElementById("mvLocal")?.value?.trim() || "";
+      const empleado = document.getElementById("mvEmpleado")?.value?.trim() || "";
+      const arrendatarioPropietario = document.getElementById("mvArrendatarioPropietario")?.value?.trim() || "";
+      const proveedorEmpresa = document.getElementById("mvProveedorEmpresa")?.value?.trim() || "";
+      const rut = document.getElementById("mvRut")?.value?.trim() || "";
+      const metodoPago = document.getElementById("mvMetodoPago")?.value?.trim() || "";
+      const fechaVencimiento = document.getElementById("mvFechaVencimiento")?.value?.trim() || "";
+      const numeroComprobante = document.getElementById("mvNumeroComprobante")?.value?.trim() || "";
+      const concepto = document.getElementById("mvConcepto")?.value?.trim() || "";
+      const notas = document.getElementById("mvNotas")?.value?.trim() || "";
 
       const AREA_MAP = {
         "gastos-comunes": "Gastos Comunes",
@@ -910,20 +898,40 @@ async function apiFetch(path, options = {}) {
       return {
         fecha, area, tipo, descripcion, monto,
         responsable: currentUser?.name || "Admin",
-
-        // detalles
-        numeroLocal,
-        arrendatarioPropietario,
-        nombreEmpleado,
-        proveedorEmpresa,
-        rutIdentificacion,
-        metodoPago,
-        comprobanteBoleta,
-        fechaVencimiento,
-        estadoPago,
-        conceptoCategoria,
         periodo,
-        notasAdicionales
+
+        // ✅ Estado de Pago
+        estadoPago,
+
+        // ✅ Detalles adicionales
+        local,
+        empleado,
+        arrendatarioPropietario,
+        proveedorEmpresa,
+        rut,
+        metodoPago,
+        fechaVencimiento,
+        numeroComprobante,
+        concepto,
+        notas,
+
+        // ✅ Duplicados “amigables” por si tu Sheet usa headers distintos
+        "Local": local,
+        "Empleado": empleado,
+        "Arrendatario-Propietario": arrendatarioPropietario,
+        "Arrendatario / Propietario": arrendatarioPropietario,
+        "Proveedor - Empresa": proveedorEmpresa,
+        "Proveedor/Empresa": proveedorEmpresa,
+        "RUT": rut,
+        "Rut": rut,
+        "Metodo de Pago": metodoPago,
+        "Método de pago": metodoPago,
+        "Fecha Vencimiento": fechaVencimiento,
+        "Fecha vencimiento": fechaVencimiento,
+        "Numero Comprobante": numeroComprobante,
+        "Número comprobante": numeroComprobante,
+        "Concepto": concepto,
+        "Notas": notas
       };
     }
 
@@ -933,7 +941,7 @@ async function apiFetch(path, options = {}) {
         const payload = readModalFields();
 
         if (EDITING_ID) {
-          payload.id = EDITING_ID;
+          payload.id = EDITING_ID; // PUT espera id en body
           const result = await apiFetch(`/.netlify/functions/movimientos`, {
             method: "PUT",
             body: JSON.stringify(payload)
@@ -950,7 +958,6 @@ async function apiFetch(path, options = {}) {
         }
 
         closeModal();
-        resetPagination();
         await loadMovimientos();
       } catch (err) {
         alert("❌ Error guardando: " + err.message);
@@ -967,57 +974,28 @@ async function apiFetch(path, options = {}) {
       };
     }
 
-    function setMovimientosInfo(start, end, total) {
-      const info = document.getElementById("movimientosInfo");
-      if (!info) return;
-      if (total === 0) info.textContent = "Mostrando 0-0 de 0 movimientos";
-      else info.textContent = `Mostrando ${start}-${end} de ${total} movimientos`;
+    function applyFiltersAndRender() {
+      const tbody = document.getElementById("movimientosBody");
+      if (!tbody || !MOV.idx) return;
+
+      const { area, tipo, desde, hasta } = getFilters();
+      let filtered = MOV.rows.slice();
+
+      if (area !== "Todas las áreas") filtered = filtered.filter(r => (r[MOV.idx.area] || "") === area);
+      if (tipo !== "Todos") filtered = filtered.filter(r => (r[MOV.idx.tipo] || "") === tipo);
+      if (desde) filtered = filtered.filter(r => (r[MOV.idx.fecha] || "") >= desde);
+      if (hasta) filtered = filtered.filter(r => (r[MOV.idx.fecha] || "") <= hasta);
+
+      renderMovRows(filtered);
     }
 
-    function renderPaginationControls(totalPages) {
-      const container = document.getElementById("paginationControls");
-      if (!container) return;
-      container.innerHTML = "";
-      if (totalPages <= 1) return;
-
-      const btnBase = "px-4 py-2 border rounded-lg text-gray-700 hover:bg-gray-50 transition";
-      const btnDisabled = "opacity-50 cursor-not-allowed";
-      const btnActive = "px-4 py-2 bg-purple-600 text-white rounded-lg";
-
-      const makeBtn = (label, onClick, disabled=false, active=false) => {
-        const b = document.createElement("button");
-        b.type = "button";
-        b.className = active ? btnActive : btnBase;
-        b.textContent = label;
-        if (disabled) {
-          b.classList.add(...btnDisabled.split(" "));
-          b.disabled = true;
-        } else {
-          b.addEventListener("click", onClick);
-        }
-        return b;
-      };
-
-      container.appendChild(makeBtn("Anterior", () => { MOV_PAGE = clamp(MOV_PAGE - 1, 1, totalPages); applyFiltersAndRender(); }, MOV_PAGE === 1));
-
-      const windowSize = 5;
-      let start = Math.max(1, MOV_PAGE - Math.floor(windowSize/2));
-      let end = Math.min(totalPages, start + windowSize - 1);
-      start = Math.max(1, end - windowSize + 1);
-
-      for (let p = start; p <= end; p++) {
-        container.appendChild(makeBtn(String(p), () => { MOV_PAGE = p; applyFiltersAndRender(); }, false, p === MOV_PAGE));
-      }
-
-      container.appendChild(makeBtn("Siguiente", () => { MOV_PAGE = clamp(MOV_PAGE + 1, 1, totalPages); applyFiltersAndRender(); }, MOV_PAGE === totalPages));
-    }
-
-    function renderMovRowsPage(rows) {
+    function renderMovRows(rows) {
       const tbody = document.getElementById("movimientosBody");
       if (!tbody) return;
       tbody.innerHTML = "";
 
-      (rows || []).forEach(r => {
+      const lastRows = rows.slice().reverse().slice(0, 20);
+      lastRows.forEach(r => {
         const id = MOV.idx.id >= 0 ? (r[MOV.idx.id] || "") : "";
         const fecha = MOV.idx.fecha >= 0 ? r[MOV.idx.fecha] : "";
         const area = MOV.idx.area >= 0 ? r[MOV.idx.area] : "";
@@ -1051,33 +1029,7 @@ async function apiFetch(path, options = {}) {
       });
     }
 
-    function applyFiltersAndRender() {
-      const tbody = document.getElementById("movimientosBody");
-      if (!tbody || !MOV.idx) return;
-
-      const { area, tipo, desde, hasta } = getFilters();
-      let filtered = MOV.rows.slice();
-
-      if (area !== "Todas las áreas") filtered = filtered.filter(r => (r[MOV.idx.area] || "") === area);
-      if (tipo !== "Todos") filtered = filtered.filter(r => (r[MOV.idx.tipo] || "") === tipo);
-      if (desde) filtered = filtered.filter(r => (r[MOV.idx.fecha] || "") >= desde);
-      if (hasta) filtered = filtered.filter(r => (r[MOV.idx.fecha] || "") <= hasta);
-
-      const ordered = filtered.slice().reverse();
-
-      const total = ordered.length;
-      const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-      MOV_PAGE = clamp(MOV_PAGE, 1, totalPages);
-
-      const startIdx = (MOV_PAGE - 1) * PAGE_SIZE;
-      const endIdx = Math.min(startIdx + PAGE_SIZE, total);
-      const pageRows = ordered.slice(startIdx, endIdx);
-
-      renderMovRowsPage(pageRows);
-      setMovimientosInfo(total === 0 ? 0 : startIdx + 1, endIdx, total);
-      renderPaginationControls(totalPages);
-    }
-
+    // Helpers para pestañas por área / resumen / alertas
     function signedAmount(tipo, monto) {
       const t = (tipo || "").toString().trim();
       const m = Math.abs(Number(monto) || 0);
@@ -1301,6 +1253,12 @@ async function apiFetch(path, options = {}) {
       });
     }
 
+    // ✅ helper para leer un valor del row según posibles headers del sheet
+    function getCell(row, header, names) {
+      const i = findCol(header, names);
+      return i >= 0 ? (row[i] || "") : "";
+    }
+
     function openEditModalById(id) {
       if (!id) return;
       const idx = MOV.idx;
@@ -1316,6 +1274,7 @@ async function apiFetch(path, options = {}) {
       const tipo = idx.tipo >= 0 ? (row[idx.tipo] || "") : "";
       const descripcion = idx.descripcion >= 0 ? (row[idx.descripcion] || "") : "";
       const monto = idx.monto >= 0 ? parseMoney(row[idx.monto]) : 0;
+      const periodo = idx.periodo >= 0 ? (row[idx.periodo] || "") : "";
 
       document.getElementById("mvFecha").value = fecha;
 
@@ -1336,21 +1295,30 @@ async function apiFetch(path, options = {}) {
 
       document.getElementById("mvDescripcion").value = descripcion;
       document.getElementById("mvMonto").value = Math.abs(monto);
+      if (periodo) document.getElementById("mvPeriodo").value = periodo;
 
-      // ✅ Cargar Detalles Adicionales desde sheet si existen columnas
-      document.getElementById("mvPeriodo").value = (idx.periodo >= 0 ? (row[idx.periodo] || "") : "");
-      document.getElementById("mvEstadoPago").value = (idx.estadoPago >= 0 ? (row[idx.estadoPago] || "") : "");
+      // ✅ cargar estado pago si viene en el sheet
+      const ep = document.getElementById("mvEstadoPago");
+      if (ep) {
+        ep.value = (idx.estadoPago >= 0 ? (row[idx.estadoPago] || "") : "");
+      }
 
-      document.getElementById("mvNumeroLocal").value = (idx.numeroLocal >= 0 ? (row[idx.numeroLocal] || "") : "");
-      document.getElementById("mvArrendatarioPropietario").value = (idx.arrendatarioPropietario >= 0 ? (row[idx.arrendatarioPropietario] || "") : "");
-      document.getElementById("mvNombreEmpleado").value = (idx.nombreEmpleado >= 0 ? (row[idx.nombreEmpleado] || "") : "");
-      document.getElementById("mvProveedorEmpresa").value = (idx.proveedorEmpresa >= 0 ? (row[idx.proveedorEmpresa] || "") : "");
-      document.getElementById("mvRutIdentificacion").value = (idx.rutIdentificacion >= 0 ? (row[idx.rutIdentificacion] || "") : "");
-      document.getElementById("mvMetodoPago").value = (idx.metodoPago >= 0 ? (row[idx.metodoPago] || "") : "");
-      document.getElementById("mvComprobanteBoleta").value = (idx.comprobanteBoleta >= 0 ? (row[idx.comprobanteBoleta] || "") : "");
-      document.getElementById("mvFechaVencimiento").value = (idx.fechaVencimiento >= 0 ? (row[idx.fechaVencimiento] || "") : "");
-      document.getElementById("mvConceptoCategoria").value = (idx.conceptoCategoria >= 0 ? (row[idx.conceptoCategoria] || "Sin especificar") : "Sin especificar");
-      document.getElementById("mvNotasAdicionales").value = (idx.notasAdicionales >= 0 ? (row[idx.notasAdicionales] || "") : "");
+      // ✅ cargar detalles adicionales si vienen en el sheet
+      const setIf = (idEl, val) => {
+        const el = document.getElementById(idEl);
+        if (el != null) el.value = val || "";
+      };
+
+      setIf("mvLocal", getCell(row, MOV.header, ["Local"]));
+      setIf("mvEmpleado", getCell(row, MOV.header, ["Empleado"]));
+      setIf("mvArrendatarioPropietario", getCell(row, MOV.header, ["Arrendatario-Propietario","Arrendatario / Propietario","ArrendatarioPropietario"]));
+      setIf("mvProveedorEmpresa", getCell(row, MOV.header, ["Proveedor - Empresa","Proveedor/Empresa","ProveedorEmpresa"]));
+      setIf("mvRut", getCell(row, MOV.header, ["RUT","Rut"]));
+      setIf("mvMetodoPago", getCell(row, MOV.header, ["Metodo de Pago","Método de pago","MetodoPago"]));
+      setIf("mvFechaVencimiento", getCell(row, MOV.header, ["Fecha Vencimiento","Fecha vencimiento","FechaVencimiento"]));
+      setIf("mvNumeroComprobante", getCell(row, MOV.header, ["Numero Comprobante","Número comprobante","NumeroComprobante"]));
+      setIf("mvConcepto", getCell(row, MOV.header, ["Concepto"]));
+      setIf("mvNotas", getCell(row, MOV.header, ["Notas","Nota"]));
 
       document.getElementById('newMovementModal').classList.remove('hidden');
     }
@@ -1362,7 +1330,6 @@ async function apiFetch(path, options = {}) {
         await apiFetch(`/.netlify/functions/movimientos?id=${encodeURIComponent(id)}`, { method: "DELETE" });
         alert("✅ Eliminado: " + id);
         logAction("Eliminar", `ID: ${id}`);
-        resetPagination();
         await loadMovimientos();
       } catch (e) {
         alert("❌ No pude eliminar: " + e.message);
@@ -1379,16 +1346,21 @@ async function apiFetch(path, options = {}) {
       applyFiltersAndRender();
       renderAreaTabs();
 
+      // refresh current tab dependent
       if (CURRENT_TAB === "alertas") renderAlertas();
       if (CURRENT_TAB === "resumen") renderResumenMensual();
       if (CURRENT_TAB === "actividad") renderActividad();
     }
 
     document.addEventListener("DOMContentLoaded", () => {
+      // Tabs click
       document.querySelectorAll(".tabs-btn[data-tab]").forEach(btn => {
-        btn.addEventListener("click", () => showTab(btn.dataset.tab, btn));
+        btn.addEventListener("click", () => {
+          showTab(btn.dataset.tab, btn);
+        });
       });
 
+      // initial tab
       const firstTabBtn = document.querySelector('.tabs-btn[data-tab="movimientos"]');
       showTab("movimientos", firstTabBtn);
 
@@ -1396,12 +1368,11 @@ async function apiFetch(path, options = {}) {
       loadMovimientos().catch(console.error);
 
       ["filterArea","filterTipo","filterDesde","filterHasta"].forEach(id => {
-        document.getElementById(id)?.addEventListener("change", () => {
-          resetPagination();
-          applyFiltersAndRender();
-        });
+        const el = document.getElementById(id);
+        if (el) el.addEventListener("change", applyFiltersAndRender);
       });
 
+      // Edit/Delete from any tab table (delegation)
       document.body.addEventListener("click", (e) => {
         const btn = e.target.closest("button[data-action]");
         if (!btn) return;
@@ -1411,6 +1382,7 @@ async function apiFetch(path, options = {}) {
         if (action === "delete") deleteMovimientoById(id);
       });
 
+      // Export
       const exportButton = document.getElementById("exportButton");
       if (exportButton) {
         if (currentUser.role !== "admin") {
@@ -1421,18 +1393,10 @@ async function apiFetch(path, options = {}) {
         }
       }
 
+      // Close modal on overlay click
       const modal = document.getElementById('newMovementModal');
       if (modal) modal.addEventListener('click', function(e) { if (e.target === this) closeModal(); });
-
-      // inicializa modal con fecha/periodo de hoy
-      const d = new Date();
-      const iso = d.toISOString().slice(0,10);
-      const ym = iso.slice(0,7);
-      document.getElementById('mvFecha').value = iso;
-      document.getElementById('mvPeriodo').value = ym;
     });
   </script>
 </body>
 </html>
-
-
