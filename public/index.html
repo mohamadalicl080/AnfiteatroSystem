@@ -970,12 +970,25 @@
         // ✅ Detalles adicionales (opcional, pero útil para editar/leer desde Sheet)
         local: findCol(header, ["Local"]),
         empleado: findCol(header, ["Empleado"]),
-        arrendatarioPropietario: findCol(header, ["Arrendatario-Propietario","Arrendatario / Propietario","ArrendatarioPropietario"]),
+        arrendatarioPropietario: findCol(header, [
+  "Arrendatario-Propietario",
+  "Arrendatario / Propietario",
+  "ArrendatarioPropietario",
+  "Arrendatario/Propietario"      // ✅ tu template
+]),
         proveedorEmpresa: findCol(header, ["Proveedor - Empresa","Proveedor/Empresa","ProveedorEmpresa"]),
         rut: findCol(header, ["RUT","Rut"]),
         metodoPago: findCol(header, ["Metodo de Pago","Método de pago","MetodoPago"]),
         fechaVencimiento: findCol(header, ["Fecha Vencimiento","Fecha vencimiento","FechaVencimiento"]),
-        numeroComprobante: findCol(header, ["Numero Comprobante","Número comprobante","NumeroComprobante"]),
+        numeroComprobante: findCol(header, [
+  "Numero Comprobante",
+  "Número comprobante",
+  "NumeroComprobante",
+  "N°Comprobante",                // ✅ tu template
+  "NºComprobante",
+  "N° Comprobante",
+  "Nº Comprobante"
+]),
         concepto: findCol(header, ["Concepto"]),
         notas: findCol(header, ["Notas","Nota"]),
       };
@@ -1508,12 +1521,29 @@
 
       setIf("mvLocal", getCell(row, MOV.header, ["Local"]));
       setIf("mvEmpleado", getCell(row, MOV.header, ["Empleado"]));
-      setIf("mvArrendatarioPropietario", getCell(row, MOV.header, ["Arrendatario-Propietario","Arrendatario / Propietario","ArrendatarioPropietario"]));
+      setIf("mvArrendatarioPropietario",
+  getCell(row, MOV.header, [
+    "Arrendatario-Propietario",
+    "Arrendatario / Propietario",
+    "ArrendatarioPropietario",
+    "Arrendatario/Propietario"    // ✅ tu template
+  ])
+);
       setIf("mvProveedorEmpresa", getCell(row, MOV.header, ["Proveedor - Empresa","Proveedor/Empresa","ProveedorEmpresa"]));
       setIf("mvRut", getCell(row, MOV.header, ["RUT","Rut"]));
       setIf("mvMetodoPago", getCell(row, MOV.header, ["Metodo de Pago","Método de pago","MetodoPago"]));
       setIf("mvFechaVencimiento", getCell(row, MOV.header, ["Fecha Vencimiento","Fecha vencimiento","FechaVencimiento"]));
-      setIf("mvNumeroComprobante", getCell(row, MOV.header, ["Numero Comprobante","Número comprobante","NumeroComprobante"]));
+      setIf("mvNumeroComprobante",
+  getCell(row, MOV.header, [
+    "Numero Comprobante",
+    "Número comprobante",
+    "NumeroComprobante",
+    "N°Comprobante",              // ✅ tu template
+    "NºComprobante",
+    "N° Comprobante",
+    "Nº Comprobante"
+  ])
+);
       setIf("mvConcepto", getCell(row, MOV.header, ["Concepto"]));
       setIf("mvNotas", getCell(row, MOV.header, ["Notas","Nota"]));
 
