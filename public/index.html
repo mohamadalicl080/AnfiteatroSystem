@@ -448,10 +448,7 @@
           <tbody id="actividadBody" class="bg-white divide-y divide-gray-200"></tbody>
         </table>
       </div>
-      <div class="flex items-center justify-between mt-4">
-        <div id="actividadInfo" class="text-sm text-gray-500"></div>
-        <div id="actividadPagination" class="flex items-center space-x-2"></div>
-      </div>
+      <p class="text-xs text-gray-400 mt-4">*Se guarda automáticamente en este navegador (no se reinicia al recargar).</p>
     </div>
 
   </div> <!-- /container -->
@@ -655,7 +652,6 @@
     // Actividad (persistente en Google Sheet "Actividad" + fallback localStorage)
     const ACT_LOG_KEY = "anfiteatro_activity_log_v1";
     let ACT_LOG = [];
-    const ACT_PAG = { pageSize: 10, page: 1, totalPages: 1 };
 
     function loadActivityLocal() {
       try {
@@ -710,14 +706,14 @@
     }
 
     // Registra acción (UI inmediata) y luego intenta persistir en Sheet (si falla, queda local)
-    async function logAction(action, detail, movimientoId = "", snapshot = null) {
+    async function logAction(action, detail, movimientoId = "") {
       const ts = new Date().toISOString();
       const entry = {
         ts,
         user: currentUser?.name || "Admin",
         role: currentUser?.role || "admin",
         action,
-        detail: packActivityDetail(detail || "", snapshot),
+        detail: detail || "",
         movimientoId: movimientoId || ""
       };
 
@@ -748,137 +744,20 @@
 function renderActividad() {
       const tbody = document.getElementById("actividadBody");
       if (!tbody) return;
-
-      const total = (ACT_LOG || []).length;
-      const totalPages = Math.max(1, Math.ceil(total / ACT_PAG.pageSize));
-      ACT_PAG.totalPages = totalPages;
-      ACT_PAG.page = clamp(ACT_PAG.page, 1, totalPages);
-
-      const startIdx = (ACT_PAG.page - 1) * ACT_PAG.pageSize;
-      const endIdx = Math.min(startIdx + ACT_PAG.pageSize, total);
-      const pageRows = (ACT_LOG || []).slice(startIdx, endIdx);
-
-      const start = total === 0 ? 0 : (startIdx + 1);
-      const end = total === 0 ? 0 : endIdx;
-      const infoEl = document.getElementById("actividadInfo");
-      if (infoEl) infoEl.textContent = `Mostrando ${start}-${end} de ${total} actividades`;
-
       tbody.innerHTML = "";
-      pageRows.forEach(a => {
+      (ACT_LOG || []).slice(0, 50).forEach(a => {
         const tr = document.createElement("tr");
         tr.className = "hover:bg-gray-50 transition duration-150";
-
         const dt = a.ts ? new Date(a.ts) : null;
         const when = dt && !isNaN(dt) ? dt.toLocaleString("es-CL") : (a.ts || "");
-
-        const tdWhen = document.createElement("td");
-        tdWhen.className = "px-6 py-4 whitespace-nowrap text-sm text-gray-900";
-        tdWhen.textContent = when;
-
-        const tdUser = document.createElement("td");
-        tdUser.className = "px-6 py-4 whitespace-nowrap text-sm text-gray-700";
-        tdUser.textContent = a.user || "";
-
-        const tdAction = document.createElement("td");
-        tdAction.className = "px-6 py-4 whitespace-nowrap text-sm font-semibold text-purple-700";
-        tdAction.textContent = a.action || "";
-
-        const tdDetail = document.createElement("td");
-        tdDetail.className = "px-6 py-4 text-sm text-gray-900";
-
-        const wrap = document.createElement("div");
-        wrap.className = "flex items-start justify-between gap-3";
-
-        const detailText = document.createElement("div");
-        detailText.className = "flex-1";
-        const parsed = parseActivitySnapshot(a.detail || "");
-        detailText.textContent = parsed.text || "";
-        wrap.appendChild(detailText);
-
-        const movId = (a.movimientoId || "").toString().trim();
-        if (movId || parsed.snap) {
-          const btn = document.createElement("button");
-          btn.type = "button";
-          btn.className = "text-blue-600 hover:text-blue-800";
-          btn.title = "Ver ticket";
-          btn.innerHTML = '<i class="fas fa-receipt"></i>';
-          btn.addEventListener("click", (e) => {
-            e.stopPropagation();
-            openTicketFromActivity(a);
-          });
-          wrap.appendChild(btn);
-        }
-
-        tdDetail.appendChild(wrap);
-
-        tr.appendChild(tdWhen);
-        tr.appendChild(tdUser);
-        tr.appendChild(tdAction);
-        tr.appendChild(tdDetail);
+        tr.innerHTML = `
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${when}</td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">${a.user || ""}</td>
+          <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold text-purple-700">${a.action || ""}</td>
+          <td class="px-6 py-4 text-sm text-gray-900">${a.detail || ""}</td>
+        `;
         tbody.appendChild(tr);
       });
-
-      renderActPagination();
-    }
-
-    function setActPage(page) {
-      ACT_PAG.page = page;
-      renderActividad();
-    }
-
-    function renderActPagination() {
-      const pagEl = document.getElementById("actividadPagination");
-      if (!pagEl) return;
-      pagEl.innerHTML = "";
-
-      const cur = ACT_PAG.page;
-      const totalPages = ACT_PAG.totalPages || 1;
-
-      function makeBtn(label, onClick, { active = false, disabled = false } = {}) {
-        const b = document.createElement("button");
-        b.type = "button";
-        b.textContent = label;
-        b.className = active
-          ? "px-4 py-2 bg-purple-600 text-white rounded-lg"
-          : "px-4 py-2 border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50";
-        if (disabled) {
-          b.disabled = true;
-          b.classList.remove("hover:bg-gray-50");
-          b.classList.add("opacity-50", "cursor-not-allowed");
-        } else if (typeof onClick === "function") {
-          b.addEventListener("click", onClick);
-        }
-        return b;
-      }
-
-      function addEllipsis() {
-        const s = document.createElement("span");
-        s.className = "px-2 py-2 text-gray-500 select-none";
-        s.textContent = "…";
-        pagEl.appendChild(s);
-      }
-
-      pagEl.appendChild(makeBtn("Anterior", () => setActPage(cur - 1), { disabled: cur <= 1 }));
-
-      const pages = [];
-      if (totalPages <= 7) {
-        for (let p = 1; p <= totalPages; p++) pages.push(p);
-      } else {
-        pages.push(1);
-        const left = Math.max(2, cur - 1);
-        const right = Math.min(totalPages - 1, cur + 1);
-        if (left > 2) pages.push("…");
-        for (let p = left; p <= right; p++) pages.push(p);
-        if (right < totalPages - 1) pages.push("…");
-        pages.push(totalPages);
-      }
-
-      pages.forEach(p => {
-        if (p === "…") return addEllipsis();
-        pagEl.appendChild(makeBtn(String(p), () => setActPage(p), { active: p === cur }));
-      });
-
-      pagEl.appendChild(makeBtn("Siguiente", () => setActPage(cur + 1), { disabled: cur >= totalPages }));
     }
 
     function showTab(tabName, evOrBtn) {
@@ -961,129 +840,15 @@ function renderActividad() {
       document.getElementById("movementTicketModal")?.classList.add("hidden");
     }
 
-    function normalizeId(v) { return String(v ?? "").trim(); }
-
-    function parseActivitySnapshot(detail) {
-      const raw = String(detail || "");
-      const reSnap = /\[\[SNAP\]\]([\s\S]*?)\[\[\/SNAP\]\]/;
-      const m = raw.match(reSnap);
-      if (!m) return { text: raw, snap: null };
-      let snap = null;
-      try { snap = JSON.parse(m[1]); } catch (_) { snap = null; }
-      const text = raw.replace(m[0], "").replace(/\s{2,}/g, " ").trim();
-      return { text, snap };
-    }
-
-    function packActivityDetail(detail, snapshot) {
-      const base = String(detail || "");
-      if (!snapshot) return base;
-      let snapStr = "";
-      try { snapStr = JSON.stringify(snapshot); } catch (_) { snapStr = ""; }
-      return snapStr ? `${base} [[SNAP]]${snapStr}[[/SNAP]]` : base;
-    }
-
-    function openTicketModalFromMovementObj(m) {
-      if (!m || typeof m !== "object") {
+    function openTicketModalById(id) {
+      if (!MOV?.idx || MOV.idx.id < 0) {
+        alert("No puedo mostrar el detalle: falta la columna ID.");
+        return;
+      }
+      const row = (MOV.rows || []).find(r => String(r[MOV.idx.id] || "") === String(id || ""));
+      if (!row) {
         alert("No encontré el movimiento.");
         return;
-      }
-
-      const tipo = String(m.tipo || "");
-      const estadoPagoVal = String(m.estadoPago || "");
-      const isAnulado = estadoPagoVal.toLowerCase().includes("anul");
-      const rawMonto = Number(m.monto || 0);
-
-      const montoFmt = (tipo === "Egreso" ? "-" : "") + formatCLP(Math.abs(rawMonto)).replace("-", "");
-      const montoContabilizado = isAnulado ? formatCLP(0) : montoFmt;
-
-      const fields = [
-        { key: "ID", value: m.id || "" },
-        { key: "Fecha", value: formatFechaISO(m.fecha || "") },
-        { key: "Área", value: m.area || "" },
-        { key: "Tipo", value: m.tipo || "" },
-        { key: "Descripción", value: m.descripcion || "" },
-        { key: "Monto", value: montoFmt },
-        { key: "Monto contabilizado", value: montoContabilizado },
-        { key: "Responsable", value: m.responsable || "" },
-        { key: "Periodo", value: m.periodo || "" },
-        { key: "Estado de Pago", value: m.estadoPago || "" },
-        { key: "Local", value: m.local || "" },
-        { key: "Empleado", value: m.empleado || "" },
-        { key: "Arrendatario / Propietario", value: m.arrendatarioPropietario || m.arrendatario || "" },
-        { key: "Proveedor / Empresa", value: m.proveedorEmpresa || m.proveedor || "" },
-        { key: "RUT", value: m.rut || "" },
-        { key: "Método de Pago", value: m.metodoPago || "" },
-        { key: "Fecha Vencimiento", value: formatFechaISO(m.fechaVencimiento || "") },
-        { key: "Número Comprobante", value: m.numeroComprobante || m.nComprobante || "" },
-        { key: "Concepto", value: m.concepto || "" },
-        { key: "Notas", value: m.notas || "" },
-      ].filter(f => String(f.value || "").trim() !== "");
-
-      const ticketEl = document.getElementById("ticketContent");
-      if (ticketEl) {
-        ticketEl.innerHTML = `
-          <div class="flex items-start justify-between gap-4">
-            <div>
-              <div class="text-sm text-gray-500">Movimiento</div>
-              <div class="text-xl font-bold text-gray-900">${String(m.area || "Sin área")}</div>
-              <div class="mt-1 text-sm text-gray-600">${String(m.descripcion || "")}</div>
-            </div>
-            <div class="text-right">
-              <div class="text-sm text-gray-500 flex items-center justify-end gap-2">
-                <span>${String(m.tipo || "")}</span>
-                ${isAnulado ? '<span class="px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-700">ANULADO</span>' : ''}
-              </div>
-              <div class="text-2xl font-extrabold ${isAnulado ? "text-gray-400 line-through" : (tipo === "Ingreso" ? "text-green-600" : "text-red-600")}">${montoFmt}</div>
-              ${isAnulado ? `<div class="text-xs text-gray-500 mt-1">Monto contabilizado: <span class="font-semibold">${montoContabilizado}</span></div>` : ""}
-            </div>
-          </div>
-          <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
-            ${fields.map(f => `
-              <div class="bg-gray-50 rounded-lg p-3 border border-gray-100">
-                <div class="text-xs font-semibold text-gray-500">${escapeHtml(String(f.key))}</div>
-                <div class="text-sm font-medium text-gray-900 mt-1 break-words">${escapeHtml(String(f.value))}</div>
-              </div>
-            `).join("")}
-          </div>
-        `;
-      }
-
-      document.getElementById("movementTicketModal")?.classList.remove("hidden");
-    }
-
-    async function openTicketFromActivity(a) {
-      const movId = normalizeId(a?.movimientoId);
-      const parsed = parseActivitySnapshot(a?.detail || "");
-      // 1) Intentar por ID (normal)
-      if (movId) {
-        const ok = await openTicketModalById(movId, { silent: true });
-        if (ok) return;
-      }
-      // 2) Si el movimiento fue eliminado, usar snapshot embebido
-      if (parsed.snap) {
-        openTicketModalFromMovementObj(parsed.snap);
-        return;
-      }
-      alert("No encontré el movimiento.");
-    }
-
-    async function openTicketModalById(id, { silent = false } = {}) {
-      if (!MOV?.idx || MOV.idx.id < 0) {
-        if (!silent) alert("No puedo mostrar el detalle: falta la columna ID.");
-        return false;
-      }
-      const want = normalizeId(id);
-      const findRow = () => (MOV.rows || []).find(r => normalizeId(r[MOV.idx.id]) === want);
-
-      let row = findRow();
-      if (!row) {
-        // Reintento: refrescar movimientos (por si el log viene de antes o la data aún no cargó)
-        try { await loadMovimientos(); } catch (_) {}
-        row = findRow();
-      }
-      if (!row) {
-        if (!silent) alert("No encontré el movimiento.");
-        return false;
       }
 
       const get = (colIdx) => (colIdx >= 0 ? (row[colIdx] ?? "") : "");
@@ -1133,22 +898,36 @@ function renderActividad() {
                 ${isAnulado ? '<span class="px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-700">ANULADO</span>' : ''}
               </div>
               <div class="text-2xl font-extrabold ${isAnulado ? "text-gray-400 line-through" : (tipo === "Ingreso" ? "text-green-600" : "text-red-600")}">${montoFmt}</div>
-              ${isAnulado ? `<div class="text-xs text-gray-500 mt-1">Monto contabilizado: <span class="font-semibold">${montoContabilizado}</span></div>` : ""}
+              ${isAnulado ? '<div class="mt-1 text-xs text-gray-500">No afecta el balance (monto contabilizado: ' + montoContabilizado + ')</div>' : ''}
             </div>
           </div>
-          <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-3">
-            ${fields.map(f => `
-              <div class="bg-gray-50 rounded-lg p-3 border border-gray-100">
-                <div class="text-xs font-semibold text-gray-500">${escapeHtml(String(f.key))}</div>
-                <div class="text-sm font-medium text-gray-900 mt-1 break-words">${escapeHtml(String(f.value))}</div>
-              </div>
-            `).join("")}
+
+          <div class="border-t border-gray-200 pt-4">
+            <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
+              ${fields.map(f => `
+                <div class="flex justify-between sm:block">
+                  <dt class="text-sm font-semibold text-gray-600">${f.key}</dt>
+                  <dd class="text-sm text-gray-900 sm:mt-1 break-words">${String(f.value)}</dd>
+                </div>
+              `).join("")}
+            </dl>
           </div>
         `;
       }
 
-      document.getElementById("movementTicketModal")?.classList.remove("hidden");
-      return true;
+      const modal = document.getElementById("movementTicketModal");
+      modal?.classList.remove("hidden");
+    }
+
+
+    async function apiFetch(path, options = {}) {
+      const res = await fetch(path, {
+        ...options,
+        headers: { "Content-Type": "application/json", ...(options.headers || {}) }
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.ok === false) throw new Error(data.error || `HTTP ${res.status}`);
+      return data;
     }
 
     function formatCLP(value) {
@@ -1520,14 +1299,14 @@ const monto = parseMoney(iMonto>=0 ? r[iMonto] : 0);
             body: JSON.stringify(payload)
           });
           alert(`✅ Movimiento editado!\nID: ${result.id || EDITING_ID}`);
-          logAction("Editar", `${payload.area} · ${payload.tipo} · ${formatCLP(payload.monto)} · ${payload.descripcion} · ${payload.estadoPago || "Sin estado"}`, EDITING_ID, { ...payload, id: EDITING_ID });
+          logAction("Editar", `${payload.area} · ${payload.tipo} · ${formatCLP(payload.monto)} · ${payload.descripcion} · ${payload.estadoPago || "Sin estado"}`, id);
         } else {
           const result = await apiFetch("/.netlify/functions/movimientos", {
             method: "POST",
             body: JSON.stringify(payload)
           });
           alert(`✅ Movimiento guardado!\nID: ${result.id}`);
-          logAction("Crear", `${payload.area} · ${payload.tipo} · ${formatCLP(payload.monto)} · ${payload.descripcion} · ${payload.estadoPago || "Sin estado"}`, result.id, { ...payload, id: result.id });
+          logAction("Crear", `${payload.area} · ${payload.tipo} · ${formatCLP(payload.monto)} · ${payload.descripcion} · ${payload.estadoPago || "Sin estado"}`, result.id);
         }
 
         closeModal();
@@ -1956,44 +1735,9 @@ const monto = parseMoney(iMonto>=0 ? r[iMonto] : 0);
       if (!id) return;
       if (!confirm(`¿Eliminar movimiento?\nID: ${id}`)) return;
       try {
-        // Snapshot para poder ver ticket incluso si el movimiento se elimina
-        let snap = null;
-        try {
-          const want = normalizeId(id);
-          const row = (MOV.rows || []).find(r => normalizeId((MOV.idx && MOV.idx.id >= 0) ? r[MOV.idx.id] : "") === want);
-          if (row && MOV.idx) {
-            const get = (ix) => (ix >= 0 ? (row[ix] ?? "") : "");
-            snap = {
-              id: want,
-              fecha: get(MOV.idx.fecha),
-              area: get(MOV.idx.area),
-              tipo: get(MOV.idx.tipo),
-              descripcion: get(MOV.idx.descripcion),
-              monto: parseMoney(get(MOV.idx.monto)),
-              responsable: get(MOV.idx.responsable),
-              periodo: get(MOV.idx.periodo),
-              estadoPago: get(MOV.idx.estadoPago),
-              local: get(MOV.idx.local),
-              empleado: get(MOV.idx.empleado),
-              arrendatarioPropietario: get(MOV.idx.arrendatarioPropietario),
-              proveedorEmpresa: get(MOV.idx.proveedorEmpresa),
-              rut: get(MOV.idx.rut),
-              metodoPago: get(MOV.idx.metodoPago),
-              fechaVencimiento: get(MOV.idx.fechaVencimiento),
-              numeroComprobante: get(MOV.idx.numeroComprobante),
-              // compat backend
-              arrendatario: get(MOV.idx.arrendatarioPropietario),
-              proveedor: get(MOV.idx.proveedorEmpresa),
-              nComprobante: get(MOV.idx.numeroComprobante),
-              concepto: get(MOV.idx.concepto),
-              notas: get(MOV.idx.notas),
-            };
-          }
-        } catch (_) {}
-
         await apiFetch(`/.netlify/functions/movimientos?id=${encodeURIComponent(id)}`, { method: "DELETE" });
         alert("✅ Eliminado: " + id);
-        logAction("Eliminar", `ID: ${id}`, id, snap);
+        logAction("Eliminar", `ID: ${id}`, id);
         await loadMovimientos();
       } catch (e) {
         alert("❌ No pude eliminar: " + e.message);
