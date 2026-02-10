@@ -448,7 +448,7 @@
           <tbody id="actividadBody" class="bg-white divide-y divide-gray-200"></tbody>
         </table>
       </div>
-      <p class="text-xs text-gray-400 mt-4">*En esta demo se registra en memoria (se reinicia al recargar).</p>
+      <p class="text-xs text-gray-400 mt-4">*Se guarda automáticamente en este navegador (no se reinicia al recargar).</p>
     </div>
 
   </div> <!-- /container -->
@@ -649,22 +649,99 @@
     ];
     let CURRENT_TAB = "movimientos";
 
-    // Actividad (log local)
-    const ACT_LOG = []; // {ts,user,action,detail}
+    // Actividad (persistente en Google Sheet "Actividad" + fallback localStorage)
+    const ACT_LOG_KEY = "anfiteatro_activity_log_v1";
+    let ACT_LOG = [];
 
-    function logAction(action, detail) {
-      const ts = new Date().toISOString();
-      ACT_LOG.unshift({
-        ts,
-        user: currentUser?.name || "Admin",
-        action,
-        detail: detail || ""
-      });
-      if (ACT_LOG.length > 200) ACT_LOG.length = 200;
+    function loadActivityLocal() {
+      try {
+        const raw = localStorage.getItem(ACT_LOG_KEY);
+        const arr = raw ? JSON.parse(raw) : [];
+        return Array.isArray(arr) ? arr : [];
+      } catch (_) {
+        return [];
+      }
+    }
+
+    function saveActivityLocal() {
+      try {
+        localStorage.setItem(ACT_LOG_KEY, JSON.stringify((ACT_LOG || []).slice(0, 200)));
+      } catch (_) {}
+    }
+
+    // Carga desde backend (Netlify function /actividad). Si falla, usa localStorage.
+    async function initActividad() {
+      try {
+        const data = await apiFetch("/.netlify/functions/actividad");
+        const header = data.header || [];
+        const rows = data.rows || [];
+
+        // header esperado: ID, FechaHora, Usuario, Rol, Acción, Descripción, IP, Dispositivo, Estado, MovimientoID
+        const h = header.map(x => norm(x));
+        const col = (name) => h.indexOf(norm(name));
+
+        const ixFecha = col("fechahora");
+        const ixUsuario = col("usuario");
+        const ixRol = col("rol");
+        const ixAccion = col("accion");
+        const ixDesc = col("descripcion");
+        const ixMovId = col("movimientoid");
+
+        ACT_LOG = rows.map(r => ({
+          ts: (ixFecha >= 0 ? (r[ixFecha] || "") : "") || "",
+          user: (ixUsuario >= 0 ? (r[ixUsuario] || "") : "") || "Admin",
+          role: (ixRol >= 0 ? (r[ixRol] || "") : "") || (currentUser?.role || ""),
+          action: (ixAccion >= 0 ? (r[ixAccion] || "") : "") || "",
+          detail: (ixDesc >= 0 ? (r[ixDesc] || "") : "") || "",
+          movimientoId: (ixMovId >= 0 ? (r[ixMovId] || "") : "") || ""
+        })).filter(x => x.ts || x.action || x.detail);
+
+        // Orden: últimos primero
+        ACT_LOG.sort((a,b) => String(b.ts||"").localeCompare(String(a.ts||"")));
+        saveActivityLocal();
+      } catch (e) {
+        ACT_LOG = loadActivityLocal();
+      }
       renderActividad();
     }
 
-    function renderActividad() {
+    // Registra acción (UI inmediata) y luego intenta persistir en Sheet (si falla, queda local)
+    async function logAction(action, detail, movimientoId = "") {
+      const ts = new Date().toISOString();
+      const entry = {
+        ts,
+        user: currentUser?.name || "Admin",
+        role: currentUser?.role || "admin",
+        action,
+        detail: detail || "",
+        movimientoId: movimientoId || ""
+      };
+
+      ACT_LOG.unshift(entry);
+      if (ACT_LOG.length > 200) ACT_LOG.length = 200;
+      saveActivityLocal();
+      renderActividad();
+
+      // Persistir en backend (no bloquea UI)
+      try {
+        await apiFetch("/.netlify/functions/actividad", {
+          method: "POST",
+          body: JSON.stringify({
+            fechaHora: entry.ts,
+            usuario: entry.user,
+            rol: entry.role,
+            accion: entry.action,
+            descripcion: entry.detail,
+            estado: "Exitoso",
+            movimientoId: entry.movimientoId,
+          })
+        });
+      } catch (e) {
+        // Si no está desplegado aún, mantenemos el log local
+      }
+    }
+
+function renderActividad() {
       const tbody = document.getElementById("actividadBody");
       if (!tbody) return;
       tbody.innerHTML = "";
@@ -1222,14 +1299,14 @@ const monto = parseMoney(iMonto>=0 ? r[iMonto] : 0);
             body: JSON.stringify(payload)
           });
           alert(`✅ Movimiento editado!\nID: ${result.id || EDITING_ID}`);
-          logAction("Editar", `${payload.area} · ${payload.tipo} · ${formatCLP(payload.monto)} · ${payload.descripcion} · ${payload.estadoPago || "Sin estado"}`);
+          logAction("Editar", `${payload.area} · ${payload.tipo} · ${formatCLP(payload.monto)} · ${payload.descripcion} · ${payload.estadoPago || "Sin estado"}`, id);
         } else {
           const result = await apiFetch("/.netlify/functions/movimientos", {
             method: "POST",
             body: JSON.stringify(payload)
           });
           alert(`✅ Movimiento guardado!\nID: ${result.id}`);
-          logAction("Crear", `${payload.area} · ${payload.tipo} · ${formatCLP(payload.monto)} · ${payload.descripcion} · ${payload.estadoPago || "Sin estado"}`);
+          logAction("Crear", `${payload.area} · ${payload.tipo} · ${formatCLP(payload.monto)} · ${payload.descripcion} · ${payload.estadoPago || "Sin estado"}`, result.id);
         }
 
         closeModal();
@@ -1660,7 +1737,7 @@ const monto = parseMoney(iMonto>=0 ? r[iMonto] : 0);
       try {
         await apiFetch(`/.netlify/functions/movimientos?id=${encodeURIComponent(id)}`, { method: "DELETE" });
         alert("✅ Eliminado: " + id);
-        logAction("Eliminar", `ID: ${id}`);
+        logAction("Eliminar", `ID: ${id}`, id);
         await loadMovimientos();
       } catch (e) {
         alert("❌ No pude eliminar: " + e.message);
@@ -1700,6 +1777,7 @@ const monto = parseMoney(iMonto>=0 ? r[iMonto] : 0);
 
       document.getElementById("movementForm")?.addEventListener("submit", saveMovement);
       loadMovimientos().catch(console.error);
+      initActividad().catch(console.error);
 
       ["filterArea","filterTipo","filterDesde","filterHasta"].forEach(id => {
         const el = document.getElementById(id);
