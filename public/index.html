@@ -1425,6 +1425,7 @@ const monto = parseMoney(iMonto>=0 ? r[iMonto] : 0);
       const iTipo  = MOV.idx?.tipo ?? -1;
       const iMonto = MOV.idx?.monto ?? -1;
       const iArea  = MOV.idx?.area ?? -1;
+      const iId   = (MOV.idx?.id ?? findCol(MOV.header, ["ID","Id","id"])) ?? -1;
 
       const alerts = [];
 
@@ -1436,6 +1437,7 @@ const monto = parseMoney(iMonto>=0 ? r[iMonto] : 0);
             alerts.push({
               kind: "warn",
               title: "Pago pendiente/atrasado",
+              id: (iId >= 0 ? (r[iId] ?? "") : ""),
               text: `${formatFechaISO(r[iFecha] || "")} · ${(r[iArea] || "")} · ${(r[iDesc] || "")}`
             });
           }
@@ -1452,6 +1454,7 @@ const monto = parseMoney(iMonto>=0 ? r[iMonto] : 0);
           alerts.push({
             kind: "danger",
             title: "Egreso alto",
+            id: (iId >= 0 ? (r[iId] ?? "") : ""),
             text: `${formatFechaISO(r[iFecha] || "")} · ${(r[iArea] || "")} · ${formatCLP(monto)} · ${(r[iDesc] || "")}`
           });
         }
@@ -1503,8 +1506,18 @@ const monto = parseMoney(iMonto>=0 ? r[iMonto] : 0);
           : "bg-yellow-50 border-yellow-200 text-yellow-800";
         const icon = a.kind === "danger" ? "fa-triangle-exclamation" : "fa-circle-exclamation";
         const div = document.createElement("div");
-        div.className = `p-4 rounded-lg border ${cls}`;
-        div.innerHTML = `<div class="font-semibold"><i class="fas ${icon} mr-2"></i>${a.title}</div><div class="text-sm mt-1">${a.text}</div>`;
+        const hasId = String(a.id || "").trim() !== "";
+        div.className = `p-4 rounded-lg border ${cls} ${hasId ? "cursor-pointer hover:shadow-sm hover:border-purple-300" : ""}`;
+        div.innerHTML = `<div class="font-semibold flex items-center justify-between gap-3">
+          <div><i class="fas ${icon} mr-2"></i>${a.title}</div>
+          ${hasId ? '<span class="text-xs text-purple-700 font-semibold">Ver ticket</span>' : ''}
+        </div><div class="text-sm mt-1">${a.text}</div>`;
+        if (hasId) {
+          div.setAttribute("role","button");
+          div.setAttribute("tabindex","0");
+          div.addEventListener("click", () => openTicketModalById(a.id));
+          div.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") openTicketModalById(a.id); });
+        }
         list.appendChild(div);
       });
     }
