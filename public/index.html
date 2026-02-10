@@ -83,7 +83,7 @@
           <div>
             <p class="text-sm opacity-90">Ingresos Mes</p>
             <h3 class="text-3xl font-bold mt-2"><span id="cardIngresosMes">$0</span></h3>
-            <p class="text-xs mt-2 opacity-75">+12% vs mes anterior</p>
+            <p class="text-xs mt-2 opacity-75"><span id="cardIngresosMesDelta">0% vs mes anterior</span></p>
           </div>
           <i class="fas fa-arrow-trend-up text-3xl opacity-50"></i>
         </div>
@@ -94,7 +94,7 @@
           <div>
             <p class="text-sm opacity-90">Egresos Mes</p>
             <h3 class="text-3xl font-bold mt-2"><span id="cardEgresosMes">$0</span></h3>
-            <p class="text-xs mt-2 opacity-75">-5% vs mes anterior</p>
+            <p class="text-xs mt-2 opacity-75"><span id="cardEgresosMesDelta">0% vs mes anterior</span></p>
           </div>
           <i class="fas fa-arrow-trend-down text-3xl opacity-50"></i>
         </div>
@@ -117,7 +117,7 @@
           <div>
             <p class="text-sm opacity-90">Morosos</p>
             <h3 class="text-3xl font-bold mt-2"><span id="cardMorosos">0</span></h3>
-            <p class="text-xs mt-2 opacity-75">3 con más de 30 días</p>
+            <p class="text-xs mt-2 opacity-75"><span id="cardMorosos30">0</span> con más de 30 días</p>
           </div>
           <i class="fas fa-exclamation-triangle text-3xl opacity-50"></i>
         </div>
@@ -1003,13 +1003,16 @@
       const iMonto = findCol(header, ["MontoAsignado","Monto Asignado","Monto","Monto_Signado","Monto Signado","Monto_Asignado"]);
       const iTipo  = findCol(header, ["Tipo"]);
       const iFecha = findCol(header, ["Fecha"]);
-      const iEstadoPago = findCol(header, ["EstadoPago","Estado Pago","Estado de Pago","Estado"]);
+            const iFechaVenc = findCol(header, ["Fecha Vencimiento","Fecha vencimiento","FechaVencimiento","Vencimiento"]);
+const iEstadoPago = findCol(header, ["EstadoPago","Estado Pago","Estado de Pago","Estado"]);
       const iArea  = findCol(header, ["Área","Area"]);
 
       const now = new Date();
       const thisMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}`;
+      const prevDate = new Date(now.getFullYear(), now.getMonth()-1, 1);
+      const prevMonth = `${prevDate.getFullYear()}-${String(prevDate.getMonth()+1).padStart(2,"0")}`;
 
-      let ingresosMes=0, egresosMes=0, ingresosTotal=0, egresosTotal=0, morosos=0, cajaChica=0;
+      let ingresosMes=0, egresosMes=0, ingresosPrevMes=0, egresosPrevMes=0, ingresosTotal=0, egresosTotal=0, morosos=0, morosos30=0, cajaChica=0;
 
       for (const r of (rows || [])) {
         const fecha = iFecha>=0 ? (r[iFecha]||"") : "";
@@ -1018,7 +1021,8 @@
         const tipoN = norm(tipo);
         const areaN = norm(area);
         const estadoPago = iEstadoPago>=0 ? (r[iEstadoPago]||"") : "";
-        const monto = parseMoney(iMonto>=0 ? r[iMonto] : 0);
+                const fechaVenc = iFechaVenc>=0 ? (r[iFechaVenc]||"") : "";
+const monto = parseMoney(iMonto>=0 ? r[iMonto] : 0);
 
         const ePago = (estadoPago || "").toString().toLowerCase();
         const isAnulado = ePago.includes("anul");
@@ -1034,11 +1038,26 @@
         if (monthOfFechaISO(fecha) === thisMonth) {
           if (isIngreso) ingresosMes += Math.abs(monto);
           if (isEgreso)  egresosMes  += Math.abs(monto);
+        } else if (monthOfFechaISO(fecha) === prevMonth) {
+          if (isIngreso) ingresosPrevMes += Math.abs(monto);
+          if (isEgreso)  egresosPrevMes  += Math.abs(monto);
         }
 
         if (estadoPago) {
           const e = ePago;
-          if (e.includes("atras") || e.includes("moro") || e.includes("pend")) morosos++;
+          const isMora = (e.includes("atras") || e.includes("moro") || e.includes("pend"));
+          if (isMora) morosos++;
+
+          // Morosos con más de 30 días (usa Fecha Vencimiento cuando exista)
+          const isOverdue = (e.includes("atras") || e.includes("moro"));
+          if (isOverdue && fechaVenc) {
+            const mV = fechaVenc.toString().match(/^(\d{4})-(\d{2})-(\d{2})/);
+            if (mV) {
+              const vencDate = new Date(Number(mV[1]), Number(mV[2]) - 1, Number(mV[3]));
+              const diffDays = Math.floor((now - vencDate) / (1000 * 60 * 60 * 24));
+              if (diffDays > 30) morosos30++;
+            }
+          }
         }
 
         const isCajaChica = areaN==="caja chica" || areaN==="caja-chica" || areaN==="cajachica";
@@ -1048,7 +1067,20 @@
         }
       }
 
-      return { ingresosMes, egresosMes, ingresosTotal, egresosTotal, balanceTotal: ingresosTotal-egresosTotal, morosos, cajaChica };
+      return { ingresosMes, egresosMes, ingresosPrevMes, egresosPrevMes, ingresosTotal, egresosTotal, balanceTotal: ingresosTotal-egresosTotal, morosos, morosos30, cajaChica };
+    }
+
+
+    function pctDeltaText(current, previous) {
+      const c = Number(current) || 0;
+      const p = Number(previous) || 0;
+      if (p === 0) {
+        if (c === 0) return "0% vs mes anterior";
+        return "— vs mes anterior";
+      }
+      const pct = ((c - p) / p) * 100;
+      const sign = pct > 0 ? "+" : "";
+      return `${sign}${Math.round(pct)}% vs mes anterior`;
     }
 
  function updateCards(header, rows) {
@@ -1056,6 +1088,10 @@
 
   setText("cardIngresosMes", formatCLP(s.ingresosMes));
   setText("cardEgresosMes", formatCLP(s.egresosMes));
+
+  // Variación vs mes anterior
+  setText("cardIngresosMesDelta", pctDeltaText(s.ingresosMes, s.ingresosPrevMes));
+  setText("cardEgresosMesDelta", pctDeltaText(s.egresosMes, s.egresosPrevMes));
   setText("cardIngresosTotal", formatCLP(s.ingresosTotal));
   setText("cardEgresosTotal", formatCLP(s.egresosTotal));
 
@@ -1064,6 +1100,7 @@
   setText("cardBalanceTotal", formatCLP(balanceTotal));
 
   setText("cardMorosos", String(s.morosos));
+  setText("cardMorosos30", String(s.morosos30));
   setText("cardCajaChica", formatCLP(s.cajaChica));
 }
 
