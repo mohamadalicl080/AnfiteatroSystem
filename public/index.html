@@ -58,9 +58,9 @@
           </div>
         </div>
         <div class="flex items-center space-x-6">
-          <div class="relative">
-            <i class="fas fa-bell text-xl cursor-pointer"></i>
-            <span class="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center notification-badge">3</span>
+          <div id="topAlertsBell" class="relative cursor-pointer" title="Ver alertas">
+            <i class="fas fa-bell text-xl"></i>
+            <span id="topAlertsBadge" class="hidden absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center notification-badge">0</span>
           </div>
           <div class="flex items-center space-x-2">
             <img src="https://ui-avatars.com/api/?name=Admin&background=fff&color=667eea" class="h-8 w-8 rounded-full" alt="User">
@@ -161,7 +161,7 @@
         </button>
         <button class="tabs-btn py-4 text-gray-600 hover:text-purple-600 whitespace-nowrap" data-tab="alertas">
           <i class="fas fa-bell mr-2"></i>Alertas
-          <span class="ml-1 bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">3</span>
+          <span id="tabAlertsBadge" class="hidden ml-1 bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">0</span>
         </button>
         <button class="tabs-btn py-4 text-gray-600 hover:text-purple-600 whitespace-nowrap" data-tab="resumen">
           <i class="fas fa-chart-pie mr-2"></i>Resumen Mensual
@@ -970,25 +970,12 @@
         // ✅ Detalles adicionales (opcional, pero útil para editar/leer desde Sheet)
         local: findCol(header, ["Local"]),
         empleado: findCol(header, ["Empleado"]),
-        arrendatarioPropietario: findCol(header, [
-  "Arrendatario-Propietario",
-  "Arrendatario / Propietario",
-  "ArrendatarioPropietario",
-  "Arrendatario/Propietario"      // ✅ tu template
-]),
+        arrendatarioPropietario: findCol(header, ["Arrendatario-Propietario","Arrendatario / Propietario","ArrendatarioPropietario"]),
         proveedorEmpresa: findCol(header, ["Proveedor - Empresa","Proveedor/Empresa","ProveedorEmpresa"]),
         rut: findCol(header, ["RUT","Rut"]),
         metodoPago: findCol(header, ["Metodo de Pago","Método de pago","MetodoPago"]),
         fechaVencimiento: findCol(header, ["Fecha Vencimiento","Fecha vencimiento","FechaVencimiento"]),
-        numeroComprobante: findCol(header, [
-  "Numero Comprobante",
-  "Número comprobante",
-  "NumeroComprobante",
-  "N°Comprobante",                // ✅ tu template
-  "NºComprobante",
-  "N° Comprobante",
-  "Nº Comprobante"
-]),
+        numeroComprobante: findCol(header, ["Numero Comprobante","Número comprobante","NumeroComprobante"]),
         concepto: findCol(header, ["Concepto"]),
         notas: findCol(header, ["Notas","Nota"]),
       };
@@ -1339,24 +1326,28 @@
       renderMovRowsInto("otrosBody", ot);
     }
 
-    function renderAlertas() {
-      const list = document.getElementById("alertasList");
-      if (!list) return;
+    let ALERTS_CACHE = [];
 
-      const iEstado = findCol(MOV.header, ["EstadoPago","Estado Pago","Estado de Pago","Estado"]);
+    function computeAlerts() {
+      const iId    = MOV.idx?.id ?? -1;
       const iFecha = MOV.idx?.fecha ?? -1;
       const iDesc  = MOV.idx?.descripcion ?? -1;
       const iTipo  = MOV.idx?.tipo ?? -1;
       const iMonto = MOV.idx?.monto ?? -1;
       const iArea  = MOV.idx?.area ?? -1;
 
-      const alerts = [];
+      const iEstado = findCol(MOV.header, ["EstadoPago","Estado Pago","Estado de Pago","Estado"]);
 
+      const alerts = [];
+      if (iId < 0) return alerts;
+
+      // 1) Pendientes / atrasados / morosos
       if (iEstado >= 0) {
         for (const r of (MOV.rows || [])) {
           const estado = (r[iEstado] || "").toString().toLowerCase();
           if (estado.includes("pend") || estado.includes("atras") || estado.includes("moro")) {
             alerts.push({
+              id: r[iId],
               kind: "warn",
               title: "Pago pendiente/atrasado",
               text: `${formatFechaISO(r[iFecha] || "")} · ${(r[iArea] || "")} · ${(r[iDesc] || "")}`
@@ -1365,12 +1356,14 @@
         }
       }
 
+      // 2) Egreso alto
       const TH = 200000;
       for (const r of (MOV.rows || [])) {
         const tipo = iTipo >= 0 ? (r[iTipo] || "") : "";
         const monto = iMonto >= 0 ? Math.abs(parseMoney(r[iMonto])) : 0;
         if (tipo === "Egreso" && monto >= TH) {
           alerts.push({
+            id: r[iId],
             kind: "danger",
             title: "Egreso alto",
             text: `${formatFechaISO(r[iFecha] || "")} · ${(r[iArea] || "")} · ${formatCLP(monto)} · ${(r[iDesc] || "")}`
@@ -1378,9 +1371,38 @@
         }
       }
 
+      return alerts;
+    }
+
+    function updateAlertBadges(alerts) {
+      const n = (alerts || []).length;
+
+      const setBadge = (el, value) => {
+        if (!el) return;
+        if (value > 0) {
+          el.textContent = value > 99 ? "99+" : String(value);
+          el.classList.remove("hidden");
+        } else {
+          el.classList.add("hidden");
+        }
+      };
+
+      setBadge(document.getElementById("topAlertsBadge"), n);
+      setBadge(document.getElementById("tabAlertsBadge"), n);
+    }
+
+    function renderAlertas() {
+      const list = document.getElementById("alertasList");
+      if (!list) return;
+
+      const alerts = computeAlerts();
+      ALERTS_CACHE = alerts;
+      updateAlertBadges(alerts);
+
       list.innerHTML = "";
+      setText("alertasCount", String(Math.min(alerts.length, 10)));
+
       const shown = alerts.slice(0, 10);
-      setText("alertasCount", String(shown.length));
 
       if (shown.length === 0) {
         list.innerHTML = `<div class="p-4 rounded-lg bg-green-50 border border-green-200 text-green-800">
@@ -1393,10 +1415,28 @@
         const cls = a.kind === "danger"
           ? "bg-red-50 border-red-200 text-red-800"
           : "bg-yellow-50 border-yellow-200 text-yellow-800";
+
         const icon = a.kind === "danger" ? "fa-triangle-exclamation" : "fa-circle-exclamation";
+
         const div = document.createElement("div");
-        div.className = `p-4 rounded-lg border ${cls}`;
-        div.innerHTML = `<div class="font-semibold"><i class="fas ${icon} mr-2"></i>${a.title}</div><div class="text-sm mt-1">${a.text}</div>`;
+        div.className = `p-4 rounded-lg border ${cls} cursor-pointer hover:shadow-sm`;
+        div.setAttribute("role", "button");
+        div.tabIndex = 0;
+
+        div.innerHTML = `
+          <div class="font-semibold"><i class="fas ${icon} mr-2"></i>${a.title}</div>
+          <div class="text-sm mt-1">${a.text}</div>
+          <div class="text-xs mt-2 opacity-70">Click para ver ticket</div>
+        `;
+
+        div.addEventListener("click", () => openTicketModalById(a.id));
+        div.addEventListener("keydown", (e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            openTicketModalById(a.id);
+          }
+        });
+
         list.appendChild(div);
       });
     }
@@ -1521,29 +1561,12 @@
 
       setIf("mvLocal", getCell(row, MOV.header, ["Local"]));
       setIf("mvEmpleado", getCell(row, MOV.header, ["Empleado"]));
-      setIf("mvArrendatarioPropietario",
-  getCell(row, MOV.header, [
-    "Arrendatario-Propietario",
-    "Arrendatario / Propietario",
-    "ArrendatarioPropietario",
-    "Arrendatario/Propietario"    // ✅ tu template
-  ])
-);
+      setIf("mvArrendatarioPropietario", getCell(row, MOV.header, ["Arrendatario-Propietario","Arrendatario / Propietario","ArrendatarioPropietario"]));
       setIf("mvProveedorEmpresa", getCell(row, MOV.header, ["Proveedor - Empresa","Proveedor/Empresa","ProveedorEmpresa"]));
       setIf("mvRut", getCell(row, MOV.header, ["RUT","Rut"]));
       setIf("mvMetodoPago", getCell(row, MOV.header, ["Metodo de Pago","Método de pago","MetodoPago"]));
       setIf("mvFechaVencimiento", getCell(row, MOV.header, ["Fecha Vencimiento","Fecha vencimiento","FechaVencimiento"]));
-      setIf("mvNumeroComprobante",
-  getCell(row, MOV.header, [
-    "Numero Comprobante",
-    "Número comprobante",
-    "NumeroComprobante",
-    "N°Comprobante",              // ✅ tu template
-    "NºComprobante",
-    "N° Comprobante",
-    "Nº Comprobante"
-  ])
-);
+      setIf("mvNumeroComprobante", getCell(row, MOV.header, ["Numero Comprobante","Número comprobante","NumeroComprobante"]));
       setIf("mvConcepto", getCell(row, MOV.header, ["Concepto"]));
       setIf("mvNotas", getCell(row, MOV.header, ["Notas","Nota"]));
 
@@ -1572,6 +1595,10 @@
       updateCards(MOV.header, MOV.rows);
       applyFiltersAndRender();
       renderAreaTabs();
+
+      // ✅ siempre actualizar badges de alertas
+      ALERTS_CACHE = computeAlerts();
+      updateAlertBadges(ALERTS_CACHE);
 
       // refresh current tab dependent
       if (CURRENT_TAB === "alertas") renderAlertas();
@@ -1629,6 +1656,16 @@
           exportButton.onclick = () => { alert("✅ Exportando datos completos del sistema...\n\nFormatos disponibles:\n• Excel (.xlsx)\n• CSV\n• PDF\n• JSON"); };
         }
       }
+
+
+      // Timbre superior: abre pestaña Alertas y muestra el ticket de la primera alerta
+      document.getElementById("topAlertsBell")?.addEventListener("click", () => {
+        const btnAlertas = document.querySelector('.tabs-btn[data-tab="alertas"]');
+        showTab("alertas", btnAlertas);
+
+        const alerts = (ALERTS_CACHE && ALERTS_CACHE.length) ? ALERTS_CACHE : computeAlerts();
+        if (alerts[0]?.id) openTicketModalById(alerts[0].id);
+      });
 
       // Close modal on overlay click
       const modal = document.getElementById('newMovementModal');
