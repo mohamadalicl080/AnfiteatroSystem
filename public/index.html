@@ -58,10 +58,10 @@
           </div>
         </div>
         <div class="flex items-center space-x-6">
-          <div class="relative">
+          <button type="button" id="navBellBtn" class="relative" onclick="openAlertasFromBell()">
             <i class="fas fa-bell text-xl cursor-pointer"></i>
-            <span class="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center notification-badge">3</span>
-          </div>
+            <span id="navBellBadge" class="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center notification-badge">3</span>
+          </button>
           <div class="flex items-center space-x-2">
             <img src="https://ui-avatars.com/api/?name=Admin&background=fff&color=667eea" class="h-8 w-8 rounded-full" alt="User">
             <div class="text-sm">
@@ -161,7 +161,7 @@
         </button>
         <button class="tabs-btn py-4 text-gray-600 hover:text-purple-600 whitespace-nowrap" data-tab="alertas">
           <i class="fas fa-bell mr-2"></i>Alertas
-          <span class="ml-1 bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">3</span>
+          <span id="tabAlertasBadge" class="ml-1 bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">3</span>
         </button>
         <button class="tabs-btn py-4 text-gray-600 hover:text-purple-600 whitespace-nowrap" data-tab="resumen">
           <i class="fas fa-chart-pie mr-2"></i>Resumen Mensual
@@ -715,6 +715,15 @@
       if (safeTab === "alertas") renderAlertas();
       if (safeTab === "resumen") renderResumenMensual();
       if (safeTab === "actividad") renderActividad();
+    }
+
+    function openAlertasFromBell() {
+      const btn = document.querySelector('.tabs-btn[data-tab="alertas"]');
+      if (btn) showTab("alertas", btn);
+      // scroll suave al panel
+      setTimeout(() => {
+        document.getElementById("alertas-tab")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 0);
     }
 
     function openNewMovementModal() {
@@ -1326,10 +1335,7 @@
       renderMovRowsInto("otrosBody", ot);
     }
 
-    function renderAlertas() {
-      const list = document.getElementById("alertasList");
-      if (!list) return;
-
+    function computeAlerts() {
       const iEstado = findCol(MOV.header, ["EstadoPago","Estado Pago","Estado de Pago","Estado"]);
       const iFecha = MOV.idx?.fecha ?? -1;
       const iDesc  = MOV.idx?.descripcion ?? -1;
@@ -1365,11 +1371,40 @@
         }
       }
 
+      return alerts;
+    }
+
+    function updateAlertBadges(total) {
+      const navBadge = document.getElementById("navBellBadge");
+      const tabBadge = document.getElementById("tabAlertasBadge");
+
+      const apply = (el) => {
+        if (!el) return;
+        if (total > 0) {
+          el.textContent = String(total);
+          el.classList.remove("hidden");
+        } else {
+          el.textContent = "";
+          el.classList.add("hidden");
+        }
+      };
+
+      apply(navBadge);
+      apply(tabBadge);
+    }
+
+    function renderAlertas() {
+      const list = document.getElementById("alertasList");
+      if (!list) return;
+
+      const alerts = computeAlerts();
+      updateAlertBadges(alerts.length);
+      setText("alertasCount", String(alerts.length));
+
       list.innerHTML = "";
       const shown = alerts.slice(0, 10);
-      setText("alertasCount", String(shown.length));
 
-      if (shown.length === 0) {
+      if (alerts.length === 0) {
         list.innerHTML = `<div class="p-4 rounded-lg bg-green-50 border border-green-200 text-green-800">
           <i class="fas fa-check-circle mr-2"></i>No hay alertas por ahora.
         </div>`;
@@ -1542,6 +1577,9 @@
       updateCards(MOV.header, MOV.rows);
       applyFiltersAndRender();
       renderAreaTabs();
+
+      // actualizar contadores/badges de alertas siempre
+      updateAlertBadges(computeAlerts().length);
 
       // refresh current tab dependent
       if (CURRENT_TAB === "alertas") renderAlertas();
