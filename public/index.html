@@ -979,12 +979,12 @@
         // ✅ Detalles adicionales (opcional, pero útil para editar/leer desde Sheet)
         local: findCol(header, ["Local"]),
         empleado: findCol(header, ["Empleado"]),
-        arrendatarioPropietario: findCol(header, ["Arrendatario-Propietario","Arrendatario / Propietario","ArrendatarioPropietario"]),
-        proveedorEmpresa: findCol(header, ["Proveedor - Empresa","Proveedor/Empresa","ProveedorEmpresa"]),
+        arrendatarioPropietario: findCol(header, ["Arrendatario-Propietario","Arrendatario / Propietario","ArrendatarioPropietario","Arrendatario/Propietario","Arrendatario Propietario","Arrendatario","arrendatario"]),
+        proveedorEmpresa: findCol(header, ["Proveedor - Empresa","Proveedor/Empresa","ProveedorEmpresa","Proveedor / Empresa","Proveedor","proveedor","Empresa"]),
         rut: findCol(header, ["RUT","Rut"]),
         metodoPago: findCol(header, ["Metodo de Pago","Método de pago","MetodoPago"]),
         fechaVencimiento: findCol(header, ["Fecha Vencimiento","Fecha vencimiento","FechaVencimiento"]),
-        numeroComprobante: findCol(header, ["Numero Comprobante","Número comprobante","NumeroComprobante"]),
+        numeroComprobante: findCol(header, ["Numero Comprobante","Número comprobante","NumeroComprobante","nComprobante","NComprobante","N° Comprobante","N° comprobante","Nº Comprobante","Nº comprobante","N°Comprobante","NºComprobante","Comprobante"]),
         concepto: findCol(header, ["Concepto"]),
         notas: findCol(header, ["Notas","Nota"]),
       };
@@ -1146,6 +1146,25 @@
         const payload = readModalFields();
 
         if (EDITING_ID) {
+          // ✅ Seguridad: si el Sheet usa otros headers (ej: arrendatario / nComprobante),
+          // evitamos que al editar se "borren" valores porque no se pudieron leer al cargar el modal.
+          try {
+            const row = (MOV?.rows || []).find(r => (MOV?.idx?.id >= 0 ? String(r[MOV.idx.id] || "") : "") === String(EDITING_ID));
+            if (row && Array.isArray(MOV?.header)) {
+              const prevArr = getCell(row, MOV.header, ["Arrendatario-Propietario","Arrendatario / Propietario","ArrendatarioPropietario","Arrendatario/Propietario","Arrendatario Propietario","Arrendatario","arrendatario"]);
+              const prevNum = getCell(row, MOV.header, ["Numero Comprobante","Número comprobante","NumeroComprobante","nComprobante","NComprobante","N° Comprobante","N° comprobante","Nº Comprobante","Nº comprobante","N°Comprobante","NºComprobante","Comprobante"]);
+
+              if (!String(payload.arrendatarioPropietario || "").trim() && String(prevArr || "").trim()) {
+                payload.arrendatarioPropietario = prevArr;
+                payload.arrendatario = prevArr;
+              }
+              if (!String(payload.numeroComprobante || "").trim() && String(prevNum || "").trim()) {
+                payload.numeroComprobante = prevNum;
+                payload.nComprobante = prevNum;
+              }
+            }
+          } catch (_) {}
+
           payload.id = EDITING_ID; // PUT espera id en body
           const result = await apiFetch(`/.netlify/functions/movimientos`, {
             method: "PUT",
@@ -1543,12 +1562,12 @@
 
       setIf("mvLocal", getCell(row, MOV.header, ["Local"]));
       setIf("mvEmpleado", getCell(row, MOV.header, ["Empleado"]));
-      setIf("mvArrendatarioPropietario", getCell(row, MOV.header, ["Arrendatario-Propietario","Arrendatario / Propietario","ArrendatarioPropietario"]));
-      setIf("mvProveedorEmpresa", getCell(row, MOV.header, ["Proveedor - Empresa","Proveedor/Empresa","ProveedorEmpresa"]));
+      setIf("mvArrendatarioPropietario", getCell(row, MOV.header, ["Arrendatario-Propietario","Arrendatario / Propietario","ArrendatarioPropietario","Arrendatario/Propietario","Arrendatario Propietario","Arrendatario","arrendatario"]));
+      setIf("mvProveedorEmpresa", getCell(row, MOV.header, ["Proveedor - Empresa","Proveedor/Empresa","ProveedorEmpresa","Proveedor / Empresa","Proveedor","proveedor","Empresa"]));
       setIf("mvRut", getCell(row, MOV.header, ["RUT","Rut"]));
       setIf("mvMetodoPago", getCell(row, MOV.header, ["Metodo de Pago","Método de pago","MetodoPago"]));
       setIf("mvFechaVencimiento", getCell(row, MOV.header, ["Fecha Vencimiento","Fecha vencimiento","FechaVencimiento"]));
-      setIf("mvNumeroComprobante", getCell(row, MOV.header, ["Numero Comprobante","Número comprobante","NumeroComprobante"]));
+      setIf("mvNumeroComprobante", getCell(row, MOV.header, ["Numero Comprobante","Número comprobante","NumeroComprobante","nComprobante","NComprobante","N° Comprobante","N° comprobante","Nº Comprobante","Nº comprobante","N°Comprobante","NºComprobante","Comprobante"]));
       setIf("mvConcepto", getCell(row, MOV.header, ["Concepto"]));
       setIf("mvNotas", getCell(row, MOV.header, ["Notas","Nota"]));
 
