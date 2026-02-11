@@ -451,6 +451,17 @@
           <tbody id="actividadBody" class="bg-white divide-y divide-gray-200"></tbody>
         </table>
       </div>
+
+      <!-- Paginación (10 por página) -->
+      <div class="flex justify-between items-center mt-4">
+        <div id="actividadInfo" class="text-sm text-gray-500"></div>
+        <div class="flex items-center space-x-2">
+          <button id="actividadPrev" type="button" class="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">Anterior</button>
+          <span id="actividadPageBadge" class="px-3 py-2 rounded-lg text-sm bg-purple-100 text-purple-700 font-semibold">1</span>
+          <button id="actividadNext" type="button" class="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">Siguiente</button>
+        </div>
+      </div>
+
       <p class="text-xs text-gray-400 mt-4">*Se registra en Google Sheets (Actividad).</p>
     </div>
 
@@ -655,6 +666,7 @@
     // Actividad (persistida en Sheet)
     const ACT_LOCAL = []; // fallback: {ts,user,action,detail,movimientoId}
     const ACT = { header: [], rows: [], idx: null, loadedAt: 0 };
+    const ACT_PAG = { pageSize: 10, page: 1, totalPages: 1, totalItems: 0 };
 
     function buildActIdx(header) {
       return {
@@ -684,6 +696,9 @@
 
     function logAction(action, detail, movimientoId = "") {
       const ts = new Date().toISOString();
+
+      // siempre mostrar lo más reciente
+      ACT_PAG.page = 1;
 
       // fallback local (por si falla la red)
       ACT_LOCAL.unshift({
@@ -727,18 +742,18 @@
         tbody.innerHTML = "";
 
         const idx = ACT.idx;
-        const rows = (ACT.rows || []).slice().reverse().slice(0, 50); // últimas 50 (más recientes primero)
+        const rowsNewestFirst = (ACT.rows || []).slice().reverse(); // más recientes primero
 
-        const useLocal = !idx || rows.length === 0;
+        const useLocal = !idx || rowsNewestFirst.length === 0;
         const items = useLocal
-          ? (ACT_LOCAL || []).slice(0, 50).map(a => ({
+          ? (ACT_LOCAL || []).slice().map(a => ({
               when: a.ts,
               usuario: a.user,
               accion: a.action,
               descripcion: a.detail,
               movimientoId: a.movimientoId
             }))
-          : rows.map(r => ({
+          : rowsNewestFirst.map(r => ({
               when: idx.fechaHora >= 0 ? (r[idx.fechaHora] || "") : "",
               usuario: idx.usuario >= 0 ? (r[idx.usuario] || "") : "",
               accion: idx.accion >= 0 ? (r[idx.accion] || "") : "",
@@ -746,7 +761,44 @@
               movimientoId: idx.movimientoId >= 0 ? (r[idx.movimientoId] || "") : ""
             }));
 
-        items.forEach(a => {
+        // paginación
+        ACT_PAG.totalItems = items.length;
+        ACT_PAG.totalPages = Math.max(1, Math.ceil(ACT_PAG.totalItems / ACT_PAG.pageSize));
+        if (ACT_PAG.page > ACT_PAG.totalPages) ACT_PAG.page = ACT_PAG.totalPages;
+        if (ACT_PAG.page < 1) ACT_PAG.page = 1;
+        const start = (ACT_PAG.page - 1) * ACT_PAG.pageSize;
+        const end = start + ACT_PAG.pageSize;
+        const pageItems = items.slice(start, end);
+
+        // UI paginación
+        const info = document.getElementById("actividadInfo");
+        const prev = document.getElementById("actividadPrev");
+        const next = document.getElementById("actividadNext");
+        const badge = document.getElementById("actividadPageBadge");
+
+        if (info) {
+          const a = ACT_PAG.totalItems === 0 ? 0 : (start + 1);
+          const b = Math.min(end, ACT_PAG.totalItems);
+          info.textContent = `Mostrando ${a}-${b} de ${ACT_PAG.totalItems} actividades`;
+        }
+        if (badge) badge.textContent = `${ACT_PAG.page}/${ACT_PAG.totalPages}`;
+
+        if (prev) {
+          prev.disabled = ACT_PAG.page <= 1;
+          prev.onclick = () => {
+            ACT_PAG.page = Math.max(1, ACT_PAG.page - 1);
+            renderActividad();
+          };
+        }
+        if (next) {
+          next.disabled = ACT_PAG.page >= ACT_PAG.totalPages;
+          next.onclick = () => {
+            ACT_PAG.page = Math.min(ACT_PAG.totalPages, ACT_PAG.page + 1);
+            renderActividad();
+          };
+        }
+
+        pageItems.forEach(a => {
           const tr = document.createElement("tr");
           tr.className = "hover:bg-gray-50 transition duration-150";
 
@@ -770,7 +822,7 @@
           tbody.appendChild(tr);
         });
 
-        if (items.length === 0) {
+        if (pageItems.length === 0) {
           const tr = document.createElement("tr");
           tr.innerHTML = `<td class="px-6 py-6 text-sm text-gray-500" colspan="4">Aún no hay actividad registrada.</td>`;
           tbody.appendChild(tr);
@@ -809,7 +861,7 @@
       }
       if (safeTab === "alertas") renderAlertas();
       if (safeTab === "resumen") renderResumenMensual();
-      if (safeTab === "actividad") renderActividad();
+      if (safeTab === "actividad") { ACT_PAG.page = 1; renderActividad(); }
     }
 
     function openNewMovementModal() {
