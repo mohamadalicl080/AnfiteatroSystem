@@ -59,8 +59,10 @@
         </div>
         <div class="flex items-center space-x-6">
           <div class="relative">
-            <i class="fas fa-bell text-xl cursor-pointer"></i>
-            <span class="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center notification-badge">3</span>
+            <button id="navBellBtn" type="button" class="focus:outline-none" title="Ver alertas">
+              <i class="fas fa-bell text-xl cursor-pointer"></i>
+            </button>
+            <span id="navAlertasBadge" class="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center notification-badge hidden">0</span>
           </div>
           <div class="flex items-center space-x-2">
             <img src="https://ui-avatars.com/api/?name=Admin&background=fff&color=667eea" class="h-8 w-8 rounded-full" alt="User">
@@ -83,7 +85,7 @@
           <div>
             <p class="text-sm opacity-90">Ingresos Mes</p>
             <h3 class="text-3xl font-bold mt-2"><span id="cardIngresosMes">$0</span></h3>
-            <p class="text-xs mt-2 opacity-75">+12% vs mes anterior</p>
+            <p id="cardIngresosMesLine" class="text-xs mt-2 opacity-75">—</p>
           </div>
           <i class="fas fa-arrow-trend-up text-3xl opacity-50"></i>
         </div>
@@ -94,7 +96,7 @@
           <div>
             <p class="text-sm opacity-90">Egresos Mes</p>
             <h3 class="text-3xl font-bold mt-2"><span id="cardEgresosMes">$0</span></h3>
-            <p class="text-xs mt-2 opacity-75">-5% vs mes anterior</p>
+            <p id="cardEgresosMesLine" class="text-xs mt-2 opacity-75">—</p>
           </div>
           <i class="fas fa-arrow-trend-down text-3xl opacity-50"></i>
         </div>
@@ -117,7 +119,7 @@
           <div>
             <p class="text-sm opacity-90">Morosos</p>
             <h3 class="text-3xl font-bold mt-2"><span id="cardMorosos">0</span></h3>
-            <p class="text-xs mt-2 opacity-75">3 con más de 30 días</p>
+            <p id="cardMorososLine" class="text-xs mt-2 opacity-75">—</p>
           </div>
           <i class="fas fa-exclamation-triangle text-3xl opacity-50"></i>
         </div>
@@ -161,7 +163,7 @@
         </button>
         <button class="tabs-btn py-4 text-gray-600 hover:text-purple-600 whitespace-nowrap" data-tab="alertas">
           <i class="fas fa-bell mr-2"></i>Alertas
-          <span class="ml-1 bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">3</span>
+          <span id="tabAlertasBadge" class="ml-1 bg-red-500 text-white text-xs px-2 py-0.5 rounded-full hidden">0</span>
         </button>
         <button class="tabs-btn py-4 text-gray-600 hover:text-purple-600 whitespace-nowrap" data-tab="resumen">
           <i class="fas fa-chart-pie mr-2"></i>Resumen Mensual
@@ -448,7 +450,7 @@
           <tbody id="actividadBody" class="bg-white divide-y divide-gray-200"></tbody>
         </table>
       </div>
-      <p class="text-xs text-gray-400 mt-4">*En esta demo se registra en memoria (se reinicia al recargar).</p>
+      <p class="text-xs text-gray-400 mt-4">*Se registra en Google Sheets (Actividad).</p>
     </div>
 
   </div> <!-- /container -->
@@ -649,37 +651,129 @@
     ];
     let CURRENT_TAB = "movimientos";
 
-    // Actividad (log local)
-    const ACT_LOG = []; // {ts,user,action,detail}
+    // Actividad (persistida en Sheet)
+    const ACT_LOCAL = []; // fallback: {ts,user,action,detail,movimientoId}
+    const ACT = { header: [], rows: [], idx: null, loadedAt: 0 };
 
-    function logAction(action, detail) {
+    function buildActIdx(header) {
+      return {
+        id: findCol(header, ["ID"]),
+        fechaHora: findCol(header, ["FechaHora","Fecha/Hora","Fecha Hora"]),
+        usuario: findCol(header, ["Usuario"]),
+        rol: findCol(header, ["Rol"]),
+        accion: findCol(header, ["Acción","Accion"]),
+        descripcion: findCol(header, ["Descripción","Descripcion","Detalle"]),
+        movimientoId: findCol(header, ["MovimientoID","MovimientoId","Movimiento ID"]),
+      };
+    }
+
+    async function loadActividad({ force = false } = {}) {
+      const now = Date.now();
+      if (!force && ACT.loadedAt && (now - ACT.loadedAt) < 15000) return; // 15s cache
+      try {
+        const data = await apiFetch("/.netlify/functions/actividad");
+        ACT.header = data.header || [];
+        ACT.rows = data.rows || [];
+        ACT.idx = buildActIdx(ACT.header);
+        ACT.loadedAt = now;
+      } catch (e) {
+        console.warn("No pude cargar actividad remota:", e);
+      }
+    }
+
+    function logAction(action, detail, movimientoId = "") {
       const ts = new Date().toISOString();
-      ACT_LOG.unshift({
+
+      // fallback local (por si falla la red)
+      ACT_LOCAL.unshift({
         ts,
         user: currentUser?.name || "Admin",
         action,
-        detail: detail || ""
+        detail: detail || "",
+        movimientoId: movimientoId || ""
       });
-      if (ACT_LOG.length > 200) ACT_LOG.length = 200;
-      renderActividad();
+      if (ACT_LOCAL.length > 200) ACT_LOCAL.length = 200;
+
+      // persistir en Sheet (no bloquea UI)
+      apiFetch("/.netlify/functions/actividad", {
+        method: "POST",
+        body: JSON.stringify({
+          usuario: currentUser?.name || "Admin",
+          rol: currentUser?.role || "admin",
+          accion: action,
+          descripcion: detail || "",
+          movimientoId: movimientoId || "",
+          estado: "OK",
+          dispositivo: navigator.userAgent || ""
+        })
+      }).then(() => {
+        // refrescar cache pronto
+        ACT.loadedAt = 0;
+        if (CURRENT_TAB === "actividad") renderActividad();
+      }).catch(err => {
+        console.warn("No pude guardar actividad:", err);
+      });
+
+      if (CURRENT_TAB === "actividad") renderActividad();
     }
 
     function renderActividad() {
       const tbody = document.getElementById("actividadBody");
       if (!tbody) return;
-      tbody.innerHTML = "";
-      (ACT_LOG || []).slice(0, 50).forEach(a => {
-        const tr = document.createElement("tr");
-        tr.className = "hover:bg-gray-50 transition duration-150";
-        const dt = a.ts ? new Date(a.ts) : null;
-        const when = dt && !isNaN(dt) ? dt.toLocaleString("es-CL") : (a.ts || "");
-        tr.innerHTML = `
-          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${when}</td>
-          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">${a.user || ""}</td>
-          <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold text-purple-700">${a.action || ""}</td>
-          <td class="px-6 py-4 text-sm text-gray-900">${a.detail || ""}</td>
-        `;
-        tbody.appendChild(tr);
+
+      // carga remota y luego pinta
+      loadActividad().then(() => {
+        tbody.innerHTML = "";
+
+        const idx = ACT.idx;
+        const rows = (ACT.rows || []).slice().reverse().slice(0, 50); // últimas 50 (más recientes primero)
+
+        const useLocal = !idx || rows.length === 0;
+        const items = useLocal
+          ? (ACT_LOCAL || []).slice(0, 50).map(a => ({
+              when: a.ts,
+              usuario: a.user,
+              accion: a.action,
+              descripcion: a.detail,
+              movimientoId: a.movimientoId
+            }))
+          : rows.map(r => ({
+              when: idx.fechaHora >= 0 ? (r[idx.fechaHora] || "") : "",
+              usuario: idx.usuario >= 0 ? (r[idx.usuario] || "") : "",
+              accion: idx.accion >= 0 ? (r[idx.accion] || "") : "",
+              descripcion: idx.descripcion >= 0 ? (r[idx.descripcion] || "") : "",
+              movimientoId: idx.movimientoId >= 0 ? (r[idx.movimientoId] || "") : ""
+            }));
+
+        items.forEach(a => {
+          const tr = document.createElement("tr");
+          tr.className = "hover:bg-gray-50 transition duration-150";
+
+          const dt = a.when ? new Date(a.when) : null;
+          const when = dt && !isNaN(dt) ? dt.toLocaleString("es-CL") : (a.when || "");
+
+          tr.innerHTML = `
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${when}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">${a.usuario || ""}</td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold text-purple-700">${a.accion || ""}</td>
+            <td class="px-6 py-4 text-sm text-gray-900">${a.descripcion || ""}</td>
+          `;
+
+          // Si tiene movimiento asociado, permitir abrir ticket
+          if (a.movimientoId) {
+            tr.classList.add("cursor-pointer");
+            tr.title = "Ver ticket";
+            tr.addEventListener("click", () => openTicketModalById(a.movimientoId));
+          }
+
+          tbody.appendChild(tr);
+        });
+
+        if (items.length === 0) {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `<td class="px-6 py-6 text-sm text-gray-500" colspan="4">Aún no hay actividad registrada.</td>`;
+          tbody.appendChild(tr);
+        }
       });
     }
 
@@ -768,7 +862,10 @@
       const get = (colIdx) => (colIdx >= 0 ? (row[colIdx] ?? "") : "");
       const rawMonto = MOV.idx.monto >= 0 ? parseMoney(get(MOV.idx.monto)) : 0;
       const tipo = String(get(MOV.idx.tipo) || "");
-      const montoFmt = (tipo === "Egreso" ? "-" : "") + formatCLP(Math.abs(rawMonto)).replace("-", "");
+      const estadoPagoRaw = String(get(MOV.idx.estadoPago) || "");
+      const isAnulado = isAnuladoEstado(estadoPagoRaw);
+      const montoBase = isAnulado ? 0 : Math.abs(rawMonto);
+      const montoFmt = (tipo === "Egreso" ? "-" : "") + formatCLP(montoBase).replace("-", "");
 
       const fields = [
         { key: "ID", value: get(MOV.idx.id) },
@@ -803,7 +900,8 @@
             </div>
             <div class="text-right">
               <div class="text-sm text-gray-500">${String(get(MOV.idx.tipo) || "")}</div>
-              <div class="text-2xl font-extrabold ${tipo === "Ingreso" ? "text-green-600" : "text-red-600"}">${montoFmt}</div>
+              <div class="text-2xl font-extrabold ${isAnulado ? "text-gray-500" : (tipo === "Ingreso" ? "text-green-600" : "text-red-600")}">${montoFmt}</div>
+              ${isAnulado ? `<div class="mt-1 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-200 text-gray-700">ANULADO</div>` : ``}
             </div>
           </div>
 
@@ -857,6 +955,11 @@
       const n = Number(cleaned);
       return Number.isFinite(n) ? n : 0;
     }
+    function isAnuladoEstado(estadoPago) {
+      const e = norm(estadoPago);
+      return e.includes("anul");
+    }
+
 
     function setText(id, value) { const el = document.getElementById(id); if (el) el.textContent = value; }
     function monthOfFechaISO(fecha) { const m = (fecha || "").toString().match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? `${m[1]}-${m[2]}` : ""; }
@@ -964,18 +1067,18 @@
         descripcion: findCol(header, ["Descripción", "Descripcion"]),
         monto: findCol(header, ["Monto", "MontoAsignado", "Monto Asignado", "Monto_Signado", "Monto Signado", "Monto_Asignado"]),
         responsable: findCol(header, ["Responsable"]),
-        periodo: findCol(header, ["Periodo", "Período"]),
+        periodo: findCol(header, ["Periodo", "Período", "Período(YYYY-MM)", "Periodo(YYYY-MM)"]),
         // ✅ Estado de Pago
         estadoPago: findCol(header, ["EstadoPago","Estado Pago","Estado de Pago","Estado"]),
         // ✅ Detalles adicionales (opcional, pero útil para editar/leer desde Sheet)
         local: findCol(header, ["Local"]),
         empleado: findCol(header, ["Empleado"]),
-        arrendatarioPropietario: findCol(header, ["Arrendatario-Propietario","Arrendatario / Propietario","ArrendatarioPropietario"]),
-        proveedorEmpresa: findCol(header, ["Proveedor - Empresa","Proveedor/Empresa","ProveedorEmpresa"]),
+        arrendatarioPropietario: findCol(header, ["Arrendatario/Propietario","Arrendatario-Propietario","Arrendatario / Propietario","ArrendatarioPropietario"]),
+        proveedorEmpresa: findCol(header, ["Proveedor/Empresa","Proveedor - Empresa","Proveedor/Empresa","ProveedorEmpresa"]),
         rut: findCol(header, ["RUT","Rut"]),
-        metodoPago: findCol(header, ["Metodo de Pago","Método de pago","MetodoPago"]),
-        fechaVencimiento: findCol(header, ["Fecha Vencimiento","Fecha vencimiento","FechaVencimiento"]),
-        numeroComprobante: findCol(header, ["Numero Comprobante","Número comprobante","NumeroComprobante"]),
+        metodoPago: findCol(header, ["MétodoPago","MetodoPago","Metodo de Pago","Método de pago","MetodoPago"]),
+        fechaVencimiento: findCol(header, ["FechaVencimiento","Fecha Vencimiento","Fecha vencimiento","FechaVencimiento"]),
+        numeroComprobante: findCol(header, ["N°Comprobante","NºComprobante","N° Comprobante","Numero Comprobante","Número comprobante","NumeroComprobante"]),
         concepto: findCol(header, ["Concepto"]),
         notas: findCol(header, ["Notas","Nota"]),
       };
@@ -987,11 +1090,15 @@
       const iFecha = findCol(header, ["Fecha"]);
       const iEstadoPago = findCol(header, ["EstadoPago","Estado Pago","Estado de Pago","Estado"]);
       const iArea  = findCol(header, ["Área","Area"]);
+      const iFechaVenc = findCol(header, ["FechaVencimiento","Fecha Vencimiento","Fecha vencimiento"]);
 
       const now = new Date();
       const thisMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,"0")}`;
+      const prevMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const prevMonth = `${prevMonthDate.getFullYear()}-${String(prevMonthDate.getMonth()+1).padStart(2,"0")}`;
 
-      let ingresosMes=0, egresosMes=0, ingresosTotal=0, egresosTotal=0, morosos=0, cajaChica=0;
+      let ingresosMes=0, egresosMes=0, ingresosMesPrev=0, egresosMesPrev=0;
+      let ingresosTotal=0, egresosTotal=0, morosos=0, morosos30=0, cajaChica=0;
 
       for (const r of (rows || [])) {
         const fecha = iFecha>=0 ? (r[iFecha]||"") : "";
@@ -1000,6 +1107,8 @@
         const tipoN = norm(tipo);
         const areaN = norm(area);
         const estadoPago = iEstadoPago>=0 ? (r[iEstadoPago]||"") : "";
+        if (isAnuladoEstado(estadoPago)) continue;
+
         const monto = parseMoney(iMonto>=0 ? r[iMonto] : 0);
 
         const isIngreso = (tipoN==="ingreso") || (tipoN==="" && monto>0);
@@ -1008,14 +1117,29 @@
         if (isIngreso) ingresosTotal += Math.abs(monto);
         if (isEgreso)  egresosTotal  += Math.abs(monto);
 
-        if (monthOfFechaISO(fecha) === thisMonth) {
+        const m = monthOfFechaISO(fecha);
+        if (m === thisMonth) {
           if (isIngreso) ingresosMes += Math.abs(monto);
           if (isEgreso)  egresosMes  += Math.abs(monto);
+        } else if (m === prevMonth) {
+          if (isIngreso) ingresosMesPrev += Math.abs(monto);
+          if (isEgreso)  egresosMesPrev  += Math.abs(monto);
         }
 
         if (estadoPago) {
-          const e = estadoPago.toString().toLowerCase();
-          if (e.includes("atras") || e.includes("moro") || e.includes("pend")) morosos++;
+          const e = norm(estadoPago);
+          const isMoroso = e.includes("atras") || e.includes("moro") || e.includes("pend");
+          if (isMoroso) {
+            morosos++;
+            // >30 días: usa FechaVencimiento si existe, si no usa Fecha
+            const baseDateStr = (iFechaVenc >= 0 ? (r[iFechaVenc]||"") : "") || fecha;
+            const dm = String(baseDateStr || "").match(/^(\d{4})-(\d{2})-(\d{2})/);
+            if (dm) {
+              const d = new Date(Number(dm[1]), Number(dm[2]) - 1, Number(dm[3]));
+              const days = (now - d) / (1000*60*60*24);
+              if (days > 30) morosos30++;
+            }
+          }
         }
 
         const isCajaChica = areaN==="caja chica" || areaN==="caja-chica" || areaN==="cajachica";
@@ -1025,7 +1149,13 @@
         }
       }
 
-      return { ingresosMes, egresosMes, ingresosTotal, egresosTotal, balanceTotal: ingresosTotal-egresosTotal, morosos, cajaChica };
+      return {
+        ingresosMes, egresosMes, ingresosMesPrev, egresosMesPrev,
+        ingresosTotal, egresosTotal,
+        balanceTotal: ingresosTotal-egresosTotal,
+        morosos, morosos30,
+        cajaChica
+      };
     }
 
  function updateCards(header, rows) {
@@ -1036,9 +1166,22 @@
   setText("cardIngresosTotal", formatCLP(s.ingresosTotal));
   setText("cardEgresosTotal", formatCLP(s.egresosTotal));
 
-  // ✅ FIX: balance correcto = ingresos - egresos
+  // ✅ Balance correcto = ingresos - egresos (anulados excluidos)
   const balanceTotal = (Number(s.ingresosTotal) || 0) - (Number(s.egresosTotal) || 0);
   setText("cardBalanceTotal", formatCLP(balanceTotal));
+
+  // Líneas dinámicas (vs mes anterior)
+  const pctLine = (cur, prev) => {
+    const c = Number(cur) || 0;
+    const p = Number(prev) || 0;
+    if (p <= 0) return "Sin mes anterior";
+    const pct = ((c - p) / p) * 100;
+    const sign = pct > 0 ? "+" : "";
+    return `${sign}${pct.toFixed(0)}% vs mes anterior`;
+  };
+  setText("cardIngresosMesLine", pctLine(s.ingresosMes, s.ingresosMesPrev));
+  setText("cardEgresosMesLine", pctLine(s.egresosMes, s.egresosMesPrev));
+  setText("cardMorososLine", `${Number(s.morosos30) || 0} con más de 30 días`);
 
   setText("cardMorosos", String(s.morosos));
   setText("cardCajaChica", formatCLP(s.cajaChica));
@@ -1114,16 +1257,21 @@
         // ✅ Duplicados “amigables” por si tu Sheet usa headers distintos
         "Local": local,
         "Empleado": empleado,
+        "Arrendatario/Propietario": arrendatarioPropietario,
         "Arrendatario-Propietario": arrendatarioPropietario,
         "Arrendatario / Propietario": arrendatarioPropietario,
         "Proveedor - Empresa": proveedorEmpresa,
         "Proveedor/Empresa": proveedorEmpresa,
         "RUT": rut,
         "Rut": rut,
+        "MétodoPago": metodoPago,
+        "MetodoPago": metodoPago,
         "Metodo de Pago": metodoPago,
         "Método de pago": metodoPago,
         "Fecha Vencimiento": fechaVencimiento,
         "Fecha vencimiento": fechaVencimiento,
+        "N°Comprobante": numeroComprobante,
+        "NºComprobante": numeroComprobante,
         "Numero Comprobante": numeroComprobante,
         "Número comprobante": numeroComprobante,
         "Concepto": concepto,
@@ -1143,14 +1291,14 @@
             body: JSON.stringify(payload)
           });
           alert(`✅ Movimiento editado!\nID: ${result.id || EDITING_ID}`);
-          logAction("Editar", `${payload.area} · ${payload.tipo} · ${formatCLP(payload.monto)} · ${payload.descripcion} · ${payload.estadoPago || "Sin estado"}`);
+          logAction("Editar", `${payload.area} · ${payload.tipo} · ${formatCLP(payload.monto)} · ${payload.descripcion} · ${payload.estadoPago || "Sin estado"}`, EDITING_ID);
         } else {
           const result = await apiFetch("/.netlify/functions/movimientos", {
             method: "POST",
             body: JSON.stringify(payload)
           });
           alert(`✅ Movimiento guardado!\nID: ${result.id}`);
-          logAction("Crear", `${payload.area} · ${payload.tipo} · ${formatCLP(payload.monto)} · ${payload.descripcion} · ${payload.estadoPago || "Sin estado"}`);
+          logAction("Crear", `${payload.area} · ${payload.tipo} · ${formatCLP(payload.monto)} · ${payload.descripcion} · ${payload.estadoPago || "Sin estado"}`, result.id);
         }
 
         closeModal();
@@ -1226,7 +1374,8 @@
     }
 
     // Helpers para pestañas por área / resumen / alertas
-    function signedAmount(tipo, monto) {
+    function signedAmount(tipo, monto, estadoPago) {
+      if (isAnuladoEstado(estadoPago)) return 0;
       const t = (tipo || "").toString().trim();
       const m = Math.abs(Number(monto) || 0);
       if (t === "Egreso") return -m;
@@ -1241,12 +1390,16 @@
 
     function calcCountAndTotal(rows) {
       let total = 0;
+      let count = 0;
       for (const r of (rows || [])) {
+        const estadoPago = MOV.idx?.estadoPago >= 0 ? (r[MOV.idx.estadoPago] || "") : "";
+        if (isAnuladoEstado(estadoPago)) continue;
         const tipo = MOV.idx?.tipo >= 0 ? (r[MOV.idx.tipo] || "") : "";
         const monto = MOV.idx?.monto >= 0 ? parseMoney(r[MOV.idx.monto]) : 0;
-        total += signedAmount(tipo, monto);
+        total += signedAmount(tipo, monto, estadoPago);
+        count++;
       }
-      return { count: (rows || []).length, total };
+      return { count, total };
     }
 
     function renderMovRowsInto(tbodyId, rows) {
@@ -1330,7 +1483,8 @@
       const list = document.getElementById("alertasList");
       if (!list) return;
 
-      const iEstado = findCol(MOV.header, ["EstadoPago","Estado Pago","Estado de Pago","Estado"]);
+      const iId    = MOV.idx?.id ?? findCol(MOV.header, ["ID"]);
+      const iEstado= MOV.idx?.estadoPago ?? findCol(MOV.header, ["EstadoPago","Estado Pago","Estado de Pago","Estado"]);
       const iFecha = MOV.idx?.fecha ?? -1;
       const iDesc  = MOV.idx?.descripcion ?? -1;
       const iTipo  = MOV.idx?.tipo ?? -1;
@@ -1339,12 +1493,17 @@
 
       const alerts = [];
 
+      // Pendientes / atrasados / morosos
       if (iEstado >= 0) {
         for (const r of (MOV.rows || [])) {
-          const estado = (r[iEstado] || "").toString().toLowerCase();
-          if (estado.includes("pend") || estado.includes("atras") || estado.includes("moro")) {
+          const estado = (r[iEstado] || "").toString();
+          if (isAnuladoEstado(estado)) continue;
+          const e = norm(estado);
+          if (e.includes("pend") || e.includes("atras") || e.includes("moro")) {
+            const id = iId >= 0 ? (r[iId] || "") : "";
             alerts.push({
               kind: "warn",
+              id,
               title: "Pago pendiente/atrasado",
               text: `${formatFechaISO(r[iFecha] || "")} · ${(r[iArea] || "")} · ${(r[iDesc] || "")}`
             });
@@ -1352,22 +1511,52 @@
         }
       }
 
+      // Egresos altos
       const TH = 200000;
       for (const r of (MOV.rows || [])) {
         const tipo = iTipo >= 0 ? (r[iTipo] || "") : "";
+        const estado = iEstado >= 0 ? (r[iEstado] || "") : "";
+        if (isAnuladoEstado(estado)) continue;
         const monto = iMonto >= 0 ? Math.abs(parseMoney(r[iMonto])) : 0;
         if (tipo === "Egreso" && monto >= TH) {
+          const id = iId >= 0 ? (r[iId] || "") : "";
           alerts.push({
             kind: "danger",
+            id,
             title: "Egreso alto",
             text: `${formatFechaISO(r[iFecha] || "")} · ${(r[iArea] || "")} · ${formatCLP(monto)} · ${(r[iDesc] || "")}`
           });
         }
       }
 
-      list.innerHTML = "";
+      // Orden: más recientes primero (por fecha)
+      const sortKey = (a) => {
+        const t = (a.text || "");
+        const m = t.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+        if (!m) return 0;
+        return new Date(Number(m[3]), Number(m[2]) - 1, Number(m[1])).getTime();
+      };
+      alerts.sort((a,b) => sortKey(b) - sortKey(a));
+
       const shown = alerts.slice(0, 10);
       setText("alertasCount", String(shown.length));
+
+      // Badges (navbar y pestaña)
+      const badgeTop = document.getElementById("navAlertasBadge");
+      const badgeTab = document.getElementById("tabAlertasBadge");
+      const setBadge = (el) => {
+        if (!el) return;
+        if (shown.length > 0) {
+          el.textContent = String(shown.length);
+          el.classList.remove("hidden");
+        } else {
+          el.classList.add("hidden");
+        }
+      };
+      setBadge(badgeTop);
+      setBadge(badgeTab);
+
+      list.innerHTML = "";
 
       if (shown.length === 0) {
         list.innerHTML = `<div class="p-4 rounded-lg bg-green-50 border border-green-200 text-green-800">
@@ -1382,11 +1571,16 @@
           : "bg-yellow-50 border-yellow-200 text-yellow-800";
         const icon = a.kind === "danger" ? "fa-triangle-exclamation" : "fa-circle-exclamation";
         const div = document.createElement("div");
-        div.className = `p-4 rounded-lg border ${cls}`;
+        div.className = `p-4 rounded-lg border ${cls} cursor-pointer hover:shadow-sm transition`;
         div.innerHTML = `<div class="font-semibold"><i class="fas ${icon} mr-2"></i>${a.title}</div><div class="text-sm mt-1">${a.text}</div>`;
+        if (a.id) {
+          div.title = "Ver ticket";
+          div.addEventListener("click", () => openTicketModalById(a.id));
+        }
         list.appendChild(div);
       });
     }
+
 
     function renderResumenMensual() {
       const now = new Date();
@@ -1400,6 +1594,8 @@
 
       const monthRows = (MOV.rows || []).filter(r => {
         const f = iFecha >= 0 ? (r[iFecha] || "") : "";
+        const estado = MOV.idx?.estadoPago >= 0 ? (r[MOV.idx.estadoPago] || "") : "";
+        if (isAnuladoEstado(estado)) return false;
         return monthOfFechaISO(f) === thisMonth;
       });
 
@@ -1508,12 +1704,12 @@
 
       setIf("mvLocal", getCell(row, MOV.header, ["Local"]));
       setIf("mvEmpleado", getCell(row, MOV.header, ["Empleado"]));
-      setIf("mvArrendatarioPropietario", getCell(row, MOV.header, ["Arrendatario-Propietario","Arrendatario / Propietario","ArrendatarioPropietario"]));
-      setIf("mvProveedorEmpresa", getCell(row, MOV.header, ["Proveedor - Empresa","Proveedor/Empresa","ProveedorEmpresa"]));
+      setIf("mvArrendatarioPropietario", getCell(row, MOV.header, ["Arrendatario/Propietario","Arrendatario-Propietario","Arrendatario / Propietario","ArrendatarioPropietario"]));
+      setIf("mvProveedorEmpresa", getCell(row, MOV.header, ["Proveedor/Empresa","Proveedor - Empresa","ProveedorEmpresa"]));
       setIf("mvRut", getCell(row, MOV.header, ["RUT","Rut"]));
-      setIf("mvMetodoPago", getCell(row, MOV.header, ["Metodo de Pago","Método de pago","MetodoPago"]));
-      setIf("mvFechaVencimiento", getCell(row, MOV.header, ["Fecha Vencimiento","Fecha vencimiento","FechaVencimiento"]));
-      setIf("mvNumeroComprobante", getCell(row, MOV.header, ["Numero Comprobante","Número comprobante","NumeroComprobante"]));
+      setIf("mvMetodoPago", getCell(row, MOV.header, ["MétodoPago","MetodoPago","Metodo de Pago","Método de pago","MetodoPago"]));
+      setIf("mvFechaVencimiento", getCell(row, MOV.header, ["FechaVencimiento","Fecha Vencimiento","Fecha vencimiento","FechaVencimiento"]));
+      setIf("mvNumeroComprobante", getCell(row, MOV.header, ["N°Comprobante","NºComprobante","N° Comprobante","Numero Comprobante","Número comprobante","NumeroComprobante"]));
       setIf("mvConcepto", getCell(row, MOV.header, ["Concepto"]));
       setIf("mvNotas", getCell(row, MOV.header, ["Notas","Nota"]));
 
@@ -1526,7 +1722,7 @@
       try {
         await apiFetch(`/.netlify/functions/movimientos?id=${encodeURIComponent(id)}`, { method: "DELETE" });
         alert("✅ Eliminado: " + id);
-        logAction("Eliminar", `ID: ${id}`);
+        logAction("Eliminar", `ID: ${id}`, id);
         await loadMovimientos();
       } catch (e) {
         alert("❌ No pude eliminar: " + e.message);
@@ -1543,8 +1739,8 @@
       applyFiltersAndRender();
       renderAreaTabs();
 
-      // refresh current tab dependent
-      if (CURRENT_TAB === "alertas") renderAlertas();
+      // alertas: refrescar siempre (para badges)
+      renderAlertas();
       if (CURRENT_TAB === "resumen") renderResumenMensual();
       if (CURRENT_TAB === "actividad") renderActividad();
     }
@@ -1556,6 +1752,17 @@
           showTab(btn.dataset.tab, btn);
         });
       });
+
+
+      // Campana (navbar): abre pestaña Alertas
+      const bellBtn = document.getElementById("navBellBtn");
+      if (bellBtn) {
+        bellBtn.addEventListener("click", () => {
+          const tabBtn = document.querySelector('.tabs-btn[data-tab="alertas"]');
+          showTab("alertas", tabBtn);
+          document.getElementById("alertas-tab")?.scrollIntoView({ behavior: "smooth", block: "start" });
+        });
+      }
 
       // initial tab
       const firstTabBtn = document.querySelector('.tabs-btn[data-tab="movimientos"]');

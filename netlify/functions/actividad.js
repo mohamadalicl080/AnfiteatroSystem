@@ -4,6 +4,24 @@ const { json, requireApiKey } = require("./_lib/http");
 const SHEET_NAME = process.env.GOOGLE_SHEETS_ACTIVIDAD_SHEET || "Actividad";
 const RANGE = `${SHEET_NAME}!A:J`;
 
+function withCors(resp) {
+  resp.headers = {
+    ...(resp.headers || {}),
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization, x-api-key",
+    "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
+  };
+  return resp;
+}
+
+function safeJsonParse(body) {
+  try {
+    return JSON.parse(body || "{}");
+  } catch {
+    return {};
+  }
+}
+
 function toRow(a) {
   return [
     a.id || "",
@@ -14,14 +32,21 @@ function toRow(a) {
     a.descripcion || "",
     a.ip || "",
     a.dispositivo || "",
-    a.estado || "Exitoso",
+    a.estado || "OK",
     a.movimientoId || ""
   ];
 }
 
 exports.handler = async (event) => {
   try {
-    if (event.httpMethod === "OPTIONS") return json(200, { ok: true });
+    // CORS preflight
+    if (event.httpMethod === "OPTIONS") {
+      return withCors({
+        statusCode: 200,
+        headers: {},
+        body: JSON.stringify({ ok: true }),
+      });
+    }
 
     requireApiKey(event);
 
@@ -32,13 +57,13 @@ exports.handler = async (event) => {
       const res = await sheets.spreadsheets.values.get({ spreadsheetId, range: RANGE });
       const values = res.data.values || [];
       const [header, ...rows] = values;
-      return json(200, { ok: true, header, rows });
+      return withCors(json(200, { ok: true, header, rows }));
     }
 
     if (event.httpMethod === "POST") {
-      const payload = JSON.parse(event.body || "{}");
+      const payload = safeJsonParse(event.body);
       if (!payload.accion || !payload.usuario) {
-        return json(400, { ok: false, error: "Faltan campos requeridos (accion, usuario)." });
+        return withCors(json(400, { ok: false, error: "Faltan campos requeridos (accion, usuario)." }));
       }
       if (!payload.id) {
         payload.id = `LOG-${Date.now()}`;
@@ -53,12 +78,12 @@ exports.handler = async (event) => {
         requestBody: { values: [row] },
       });
 
-      return json(201, { ok: true, id: payload.id });
+      return withCors(json(201, { ok: true, id: payload.id }));
     }
 
-    return json(405, { ok: false, error: "Method not allowed" });
+    return withCors(json(405, { ok: false, error: "Method not allowed" }));
   } catch (err) {
     const status = err.statusCode || 500;
-    return json(status, { ok: false, error: err.message || String(err) });
+    return withCors(json(status, { ok: false, error: err.message || String(err) }));
   }
 };
