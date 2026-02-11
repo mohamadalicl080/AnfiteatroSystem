@@ -57,13 +57,14 @@
             <p class="text-xs text-purple-200">Sistema de Gestión Comercial</p>
           </div>
         </div>
-        <div class="flex items-center space-x-6">
-          <div class="relative">
-            <button id="navBellBtn" type="button" class="focus:outline-none" title="Ver alertas">
-              <i class="fas fa-bell text-xl cursor-pointer"></i>
-            </button>
-            <span id="navAlertasBadge" class="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center notification-badge hidden">0</span>
-          </div>
+	        <div class="flex items-center space-x-6">
+	          <div class="relative">
+	            <!-- Botón campana: clickable completo. El badge NO debe bloquear el click. -->
+	            <button id="navBellBtn" type="button" class="relative inline-flex items-center justify-center w-10 h-10 focus:outline-none" title="Ver alertas">
+	              <i class="fas fa-bell text-xl"></i>
+	              <span id="navAlertasBadge" class="pointer-events-none absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center notification-badge hidden">0</span>
+	            </button>
+	          </div>
           <div class="flex items-center space-x-2">
             <img src="https://ui-avatars.com/api/?name=Admin&background=fff&color=667eea" class="h-8 w-8 rounded-full" alt="User">
             <div class="text-sm">
