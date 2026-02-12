@@ -66,12 +66,15 @@
 	            </button>
 	          </div>
           <div class="flex items-center space-x-2">
-            <img src="https://ui-avatars.com/api/?name=Admin&background=fff&color=667eea" class="h-8 w-8 rounded-full" alt="User">
-            <div class="text-sm">
-              <p class="font-semibold">Admin</p>
-              <p class="text-xs text-purple-200">Administrador</p>
-            </div>
-          </div>
+  <img id="userAvatar" src="https://ui-avatars.com/api/?name=Usuario&background=fff&color=667eea" class="h-8 w-8 rounded-full" alt="User">
+  <div class="text-sm">
+    <p id="userName" class="font-semibold">Usuario</p>
+    <p id="userRoleLabel" class="text-xs text-purple-200">Rol</p>
+  </div>
+  <button id="logoutBtn" type="button" class="ml-2 text-purple-100 hover:text-white" title="Salir">
+    <i class="fas fa-right-from-bracket"></i>
+  </button>
+</div>
         </div>
       </div>
     </div>
@@ -650,7 +653,26 @@
   </div>
 
   <script>
-    const currentUser = { name: 'Admin', role: 'admin', email: 'admin@anfiteatro.cl' };
+    let currentUser = null;
+    let authToken = localStorage.getItem("anf_token") || "";
+
+    function getStoredUser() {
+      try { return JSON.parse(localStorage.getItem("anf_user") || "null"); } catch { return null; }
+    }
+    function setStoredAuth(token, user) {
+      if (token) localStorage.setItem("anf_token", token);
+      if (user) localStorage.setItem("anf_user", JSON.stringify(user));
+      authToken = token || authToken;
+      currentUser = user || currentUser;
+    }
+    function clearAuth() {
+      localStorage.removeItem("anf_token");
+      localStorage.removeItem("anf_user");
+      authToken = "";
+      currentUser = null;
+    }
+
+
     const MOV = { header: [], rows: [], idx: null };
     // Paginación (solo pestaña Movimientos)
     const MOV_PAG = { pageSize: 5, page: 1, totalPages: 1, ordered: [] }; // ordered: últimos primero
@@ -979,12 +1001,93 @@
     async function apiFetch(path, options = {}) {
       const res = await fetch(path, {
         ...options,
-        headers: { "Content-Type": "application/json", ...(options.headers || {}) }
+        headers: { "Content-Type": "application/json", ...(authToken ? { "Authorization": `Bearer ${authToken}` } : {}), ...(options.headers || {}) }
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || data.ok === false) throw new Error(data.error || `HTTP ${res.status}`);
       return data;
     }
+
+
+    async function initAuth() {
+      if (!authToken) { window.location.href = "login.html"; return false; }
+
+      // usa cache local rápido
+      const cached = getStoredUser();
+      if (cached) currentUser = cached;
+
+      // valida token con backend (si falla, vuelve a login)
+      try {
+        const res = await fetch("/.netlify/functions/me", {
+          method: "GET",
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${authToken}` }
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || data.ok === false) throw new Error(data.error || `HTTP ${res.status}`);
+        if (data.user) setStoredAuth(authToken, data.user);
+      } catch (e) {
+        clearAuth();
+        window.location.href = "login.html";
+        return false;
+      }
+
+      paintUserUI();
+      applyRoleUI();
+      return true;
+    }
+
+    function paintUserUI() {
+      if (!currentUser) return;
+      const avatar = document.getElementById("userAvatar");
+      const nameEl = document.getElementById("userName");
+      const roleEl = document.getElementById("userRoleLabel");
+      const label = roleLabel(currentUser.role);
+
+      if (avatar) avatar.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser.name || currentUser.email || "Usuario")}&background=fff&color=667eea`;
+      if (nameEl) nameEl.textContent = currentUser.name || currentUser.email || "Usuario";
+      if (roleEl) roleEl.textContent = label;
+    }
+
+    function roleLabel(role) {
+      if (role === "admin") return "Administrador";
+      if (role === "editor_full") return "Editor Full";
+      if (role === "editor_limited") return "Editor Limited";
+      return role || "";
+    }
+
+    function applyRoleUI() {
+      const isAdmin = currentUser && currentUser.role === "admin";
+      const exportBtn = document.getElementById("exportButton");
+      if (exportBtn) exportBtn.style.display = isAdmin ? "" : "none";
+
+      // pestaña actividad solo admin
+      const actividadBtn = document.querySelector('.tabs-btn[data-tab="actividad"]');
+      if (actividadBtn) actividadBtn.style.display = isAdmin ? "" : "none";
+
+      // badge "Admin" en navbar (si existiera)
+      document.querySelectorAll(".admin-only").forEach(el => {
+        el.style.display = isAdmin ? "" : "none";
+      });
+    }
+
+    function canEditRow(row) {
+      const role = currentUser?.role;
+      if (role === "admin" || role === "editor_full") return true;
+      if (role !== "editor_limited") return false;
+
+      const iCreated = MOV.idx?.creadoPorEmail ?? -1;
+      const creator = iCreated >= 0 ? (row[iCreated] || "") : "";
+      return norm(creator) === norm(currentUser.email || "");
+    }
+    function canDeleteRow(row) {
+      const role = currentUser?.role;
+      if (role === "admin" || role === "editor_full") return true;
+      if (role !== "editor_limited") return false;
+      const iCreated = MOV.idx?.creadoPorEmail ?? -1;
+      const creator = iCreated >= 0 ? (row[iCreated] || "") : "";
+      return norm(creator) === norm(currentUser.email || "");
+    }
+
 
     function formatCLP(value) {
       const n = Number(value) || 0;
@@ -1134,6 +1237,7 @@
         numeroComprobante: findCol(header, ["N°Comprobante","NºComprobante","N° Comprobante","Numero Comprobante","Número comprobante","NumeroComprobante"]),
         concepto: findCol(header, ["Concepto"]),
         notas: findCol(header, ["Notas","Nota"]),
+        creadoPorEmail: findCol(header, ["CreadoPorEmail","Creado Por Email","CreadoPorEmail","CreadoPor","Creado Por","CreadoPorMail","Creado Por Mail"]),
       };
     }
 
@@ -1418,8 +1522,17 @@
           <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600"><i class="fas fa-user-circle mr-1"></i>${responsable || ""}</td>
           <td class="px-6 py-4 whitespace-nowrap text-sm">
             <button class="text-blue-600 hover:text-blue-900 mr-3" data-action="view" data-id="${id}" title="Ver ticket"><i class="fas fa-receipt"></i></button>
-            <button class="text-purple-600 hover:text-purple-900 mr-3" data-action="edit" data-id="${id}" title="Editar"><i class="fas fa-edit"></i></button>
-            <button class="text-red-600 hover:text-red-900" data-action="delete" data-id="${id}" title="Eliminar"><i class="fas fa-trash"></i></button>
+            ${(() => {
+              const _canEdit = canEditRow(r);
+              const _canDelete = canDeleteRow(r);
+              const editBtn = _canEdit
+                ? '<button class="text-purple-600 hover:text-purple-900 mr-3" data-action="edit" data-id="'+id+'" title="Editar"><i class="fas fa-edit"></i></button>'
+                : '<button class="text-gray-300 mr-3 cursor-not-allowed" disabled title="Sin permiso"><i class="fas fa-edit"></i></button>';
+              const delBtn = _canDelete
+                ? '<button class="text-red-600 hover:text-red-900" data-action="delete" data-id="'+id+'" title="Eliminar"><i class="fas fa-trash"></i></button>'
+                : '<button class="text-gray-300 cursor-not-allowed" disabled title="Sin permiso"><i class="fas fa-trash"></i></button>';
+              return editBtn + delBtn;
+            })()}
           </td>
         `;
         tbody.appendChild(tr);
@@ -1486,8 +1599,17 @@
           <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600"><i class="fas fa-user-circle mr-1"></i>${responsable}</td>
           <td class="px-6 py-4 whitespace-nowrap text-sm">
             <button class="text-blue-600 hover:text-blue-900 mr-3" data-action="view" data-id="${id}" title="Ver ticket"><i class="fas fa-receipt"></i></button>
-            <button class="text-purple-600 hover:text-purple-900 mr-3" data-action="edit" data-id="${id}" title="Editar"><i class="fas fa-edit"></i></button>
-            <button class="text-red-600 hover:text-red-900" data-action="delete" data-id="${id}" title="Eliminar"><i class="fas fa-trash"></i></button>
+            ${(() => {
+              const _canEdit = canEditRow(r);
+              const _canDelete = canDeleteRow(r);
+              const editBtn = _canEdit
+                ? '<button class="text-purple-600 hover:text-purple-900 mr-3" data-action="edit" data-id="'+id+'" title="Editar"><i class="fas fa-edit"></i></button>'
+                : '<button class="text-gray-300 mr-3 cursor-not-allowed" disabled title="Sin permiso"><i class="fas fa-edit"></i></button>';
+              const delBtn = _canDelete
+                ? '<button class="text-red-600 hover:text-red-900" data-action="delete" data-id="'+id+'" title="Eliminar"><i class="fas fa-trash"></i></button>'
+                : '<button class="text-gray-300 cursor-not-allowed" disabled title="Sin permiso"><i class="fas fa-trash"></i></button>';
+              return editBtn + delBtn;
+            })()}
           </td>
         `;
         tbody.appendChild(tr);
@@ -1798,7 +1920,11 @@
       if (CURRENT_TAB === "actividad") renderActividad();
     }
 
-    document.addEventListener("DOMContentLoaded", () => {
+    document.addEventListener("DOMContentLoaded", async () => {
+      const authOk = await initAuth();
+      if (!authOk) return;
+      document.getElementById("logoutBtn")?.addEventListener("click", () => { clearAuth(); window.location.href = "login.html"; });
+
       // Tabs click
       document.querySelectorAll(".tabs-btn[data-tab]").forEach(btn => {
         btn.addEventListener("click", () => {

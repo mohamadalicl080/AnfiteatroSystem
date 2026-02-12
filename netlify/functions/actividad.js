@@ -1,5 +1,6 @@
 const { getSheetsClient, getSpreadsheetId } = require("./_lib/googleSheets");
 const { json, requireApiKey } = require("./_lib/http");
+const { requireAuth } = require("./_lib/auth");
 
 const SHEET_NAME = process.env.GOOGLE_SHEETS_ACTIVIDAD_SHEET || "Actividad";
 const RANGE = `${SHEET_NAME}!A:J`;
@@ -14,14 +15,6 @@ function withCors(resp) {
   return resp;
 }
 
-function safeJsonParse(body) {
-  try {
-    return JSON.parse(body || "{}");
-  } catch {
-    return {};
-  }
-}
-
 function toRow(a) {
   return [
     a.id || "",
@@ -32,28 +25,23 @@ function toRow(a) {
     a.descripcion || "",
     a.ip || "",
     a.dispositivo || "",
-    a.estado || "OK",
+    a.estado || "Exitoso",
     a.movimientoId || ""
   ];
 }
 
 exports.handler = async (event) => {
   try {
-    // CORS preflight
-    if (event.httpMethod === "OPTIONS") {
-      return withCors({
-        statusCode: 200,
-        headers: {},
-        body: JSON.stringify({ ok: true }),
-      });
-    }
+    if (event.httpMethod === "OPTIONS") return withCors(json(200, { ok: true }));
 
     requireApiKey(event);
+    const user = requireAuth(event);
 
     const sheets = getSheetsClient();
     const spreadsheetId = getSpreadsheetId();
 
     if (event.httpMethod === "GET") {
+      if (user.role !== "admin") return withCors(json(403, { ok: false, error: "⛔ Solo admin puede ver el registro de actividad." }));
       const res = await sheets.spreadsheets.values.get({ spreadsheetId, range: RANGE });
       const values = res.data.values || [];
       const [header, ...rows] = values;
@@ -61,13 +49,17 @@ exports.handler = async (event) => {
     }
 
     if (event.httpMethod === "POST") {
-      const payload = safeJsonParse(event.body);
-      if (!payload.accion || !payload.usuario) {
-        return withCors(json(400, { ok: false, error: "Faltan campos requeridos (accion, usuario)." }));
+      const payload = JSON.parse(event.body || "{}");
+
+      // Forzamos identidad desde token (evita spoof)
+      payload.usuario = user.name || user.email;
+      payload.rol = user.role;
+
+      if (!payload.accion) {
+        return withCors(json(400, { ok: false, error: "Falta 'accion'." }));
       }
-      if (!payload.id) {
-        payload.id = `LOG-${Date.now()}`;
-      }
+      if (!payload.id) payload.id = `LOG-${Date.now()}`;
+
       const row = toRow(payload);
 
       await sheets.spreadsheets.values.append({

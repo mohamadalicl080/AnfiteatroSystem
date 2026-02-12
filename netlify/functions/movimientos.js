@@ -1,5 +1,6 @@
 const { getSheetsClient, getSpreadsheetId } = require("./_lib/googleSheets");
 const { json, requireApiKey } = require("./_lib/http");
+const { requireAuth, normEmail } = require("./_lib/auth");
 
 const SHEET_NAME = process.env.GOOGLE_SHEETS_MOVIMIENTOS_SHEET || "Movimientos";
 const RANGE = `${SHEET_NAME}!A:Y`; // must cover your columns
@@ -8,7 +9,7 @@ function withCors(resp) {
   resp.headers = {
     ...(resp.headers || {}),
     "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Headers": "Content-Type, Authorization, x-api-key",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization, x-api-key, X-Export",
     "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,OPTIONS",
   };
   return resp;
@@ -107,10 +108,14 @@ exports.handler = async (event) => {
     // Protege TODO con API Key
     requireApiKey(event);
 
+    const user = requireAuth(event);
+
     const sheets = getSheetsClient();
     const spreadsheetId = getSpreadsheetId();
 
     if (event.httpMethod === "GET") {
+      const exportFlag = (event.headers && (event.headers["x-export"] || event.headers["X-Export"])) || (event.queryStringParameters && event.queryStringParameters.export);
+      if (exportFlag && user.role !== "admin") return withCors(json(403, { ok: false, error: "⛔ Solo admin puede exportar." }));
       const res = await sheets.spreadsheets.values.get({ spreadsheetId, range: RANGE });
       const values = res.data.values || [];
       const [header, ...rows] = values;
@@ -119,6 +124,10 @@ exports.handler = async (event) => {
 
     if (event.httpMethod === "POST") {
       const payload = safeJsonParse(event.body);
+
+      // setea creador desde sesión
+      payload.creadoPorEmail = user.email;
+      if (!payload.responsable) payload.responsable = user.name || user.email;
 
       if (!payload.fecha || !payload.area || !payload.tipo || !payload.descripcion) {
         return withCors(json(400, {
@@ -171,6 +180,22 @@ exports.handler = async (event) => {
         return withCors(json(404, { ok: false, error: `No encontré movimiento con id "${id}".` }));
       }
 
+      const existingRow = rows[rowIndexInRows] || [];
+      const existingObj = rowToObj(existingRow);
+
+      // Permisos eliminación
+      if (user.role === "editor_limited") {
+        const creador = normEmail(existingObj.creadoPorEmail || "");
+        if (creador && creador !== normEmail(user.email)) {
+          return withCors(json(403, { ok: false, error: "⛔ No puedes eliminar movimientos creados por otro usuario." }));
+        }
+      }
+      if (user.role === "editor_limited" || user.role === "editor_full" || user.role === "admin") {
+        // ok (limited: solo propios; full/admin: cualquiera)
+      } else {
+        return withCors(json(403, { ok: false, error: "⛔ No autorizado." }));
+      }
+
       // En batchUpdate: indices 0-based y rows excluye header => +1
       const sheetRowIndex = rowIndexInRows + 1;
       const sheetId = await getSheetIdByName(sheets, spreadsheetId, SHEET_NAME);
@@ -197,6 +222,10 @@ exports.handler = async (event) => {
     if (event.httpMethod === "PUT") {
       const qsId = event.queryStringParameters && event.queryStringParameters.id;
       const payload = safeJsonParse(event.body);
+
+      // setea creador desde sesión
+      payload.creadoPorEmail = user.email;
+      if (!payload.responsable) payload.responsable = user.name || user.email;
       const id = (qsId || payload.id || "").trim();
 
       if (!id) return withCors(json(400, { ok: false, error: "Falta id para editar." }));
@@ -213,6 +242,14 @@ exports.handler = async (event) => {
 
       const existingRow = rows[rowIndexInRows] || [];
       const existingObj = rowToObj(existingRow);
+
+      // Permisos edición
+      if (user.role === "editor_limited") {
+        const creador = normEmail(existingObj.creadoPorEmail || "");
+        if (creador && creador !== normEmail(user.email)) {
+          return withCors(json(403, { ok: false, error: "⛔ No puedes editar movimientos creados por otro usuario." }));
+        }
+      }
 
       // Mezcla: mantiene lo viejo si no lo mandas desde la web
       const merged = {

@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Anfiteatro Registro - Login</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    * { font-family: 'Inter', sans-serif; }
+    .gradient-bg { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+  </style>
+</head>
+<body class="min-h-screen gradient-bg flex items-center justify-center p-6">
+
+  <div class="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden">
+    <div class="p-6 text-white gradient-bg">
+      <div class="flex items-center gap-3">
+        <i class="fas fa-building text-2xl"></i>
+        <div>
+          <h1 class="text-xl font-bold">Anfiteatro Registro</h1>
+          <p class="text-xs text-purple-200">Acceso al sistema</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="p-6">
+      <div id="errorBox" class="hidden mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm"></div>
+
+      <form id="loginForm" class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+          <input id="email" type="email" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-400" placeholder="tu@email.com" required />
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Contraseña</label>
+          <input id="password" type="password" class="w-full border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-400" placeholder="••••••••" required />
+        </div>
+
+        <button id="submitBtn" type="submit" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2.5 rounded-lg shadow-md transition duration-200">
+          <i class="fas fa-right-to-bracket mr-2"></i>Ingresar
+        </button>
+      </form>
+
+      <p class="text-xs text-gray-400 mt-4">
+        Si es tu primera vez, debes crear usuarios en la hoja <b>Usuarios</b> (Email, PasswordHash, Rol, Nombre, Activo).
+      </p>
+    </div>
+  </div>
+
+<script>
+  // Si ya hay sesión válida, entra directo
+  const existing = localStorage.getItem("anf_token");
+  if (existing) {
+    // Validación ligera: index hará /me
+    window.location.href = "index.html";
+  }
+
+  const form = document.getElementById("loginForm");
+  const errorBox = document.getElementById("errorBox");
+  const submitBtn = document.getElementById("submitBtn");
+
+  function showError(msg) {
+    errorBox.textContent = msg;
+    errorBox.classList.remove("hidden");
+  }
+  function clearError() {
+    errorBox.classList.add("hidden");
+    errorBox.textContent = "";
+  }
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    clearError();
+
+    const email = document.getElementById("email").value.trim();
+    const password = document.getElementById("password").value;
+
+    submitBtn.disabled = true;
+    submitBtn.classList.add("opacity-70", "cursor-not-allowed");
+
+    try {
+      const res = await fetch("/.netlify/functions/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.ok === false) throw new Error(data.error || `HTTP ${res.status}`);
+
+      localStorage.setItem("anf_token", data.token);
+      localStorage.setItem("anf_user", JSON.stringify(data.user));
+      window.location.href = "index.html";
+    } catch (err) {
+      showError(err.message || "No se pudo iniciar sesión.");
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.classList.remove("opacity-70", "cursor-not-allowed");
+    }
+  });
+</script>
+
+</body>
+</html>
