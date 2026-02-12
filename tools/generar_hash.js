@@ -1,5 +1,14 @@
-// tools/generar_hash.js
-const bcrypt = require("bcryptjs");
+// tools/generar_hash.js (PBKDF2)
+// Genera hashes compatibles con netlify/functions/_lib/auth.js
+// Uso: node tools/generar_hash.js "TuPassword"
+
+const crypto = require('crypto');
+
+function hashPassword(password, { iterations = 120000, saltLen = 16 } = {}) {
+  const salt = crypto.randomBytes(saltLen);
+  const hash = crypto.pbkdf2Sync(String(password), salt, iterations, 32, 'sha256');
+  return `pbkdf2$${iterations}$${salt.toString('base64')}$${hash.toString('base64')}`;
+}
 
 const password = process.argv[2];
 if (!password) {
@@ -7,8 +16,5 @@ if (!password) {
   process.exit(1);
 }
 
-const saltRounds = 10;
-bcrypt.hash(password, saltRounds).then((hash) => {
-  console.log("Password:", password);
-  console.log("Hash:", hash);
-});
+const out = hashPassword(password);
+console.log(out);
