@@ -1982,7 +1982,8 @@
           exportButton.classList.add("opacity-50", "cursor-not-allowed");
           exportButton.onclick = (e) => { e.preventDefault(); alert("⛔ Solo el Administrador puede exportar datos del sistema"); };
         } else {
-          exportButton.onclick = () => { alert("✅ Exportando datos completos del sistema...\n\nFormatos disponibles:\n• Excel (.xlsx)\n• CSV\n• PDF\n• JSON"); };
+          exportButton.onclick = () => { window.ANF_EXPORT.runExport(); };
+
         }
       }
 
@@ -1991,5 +1992,8 @@
       if (modal) modal.addEventListener('click', function(e) { if (e.target === this) closeModal(); });
     });
   </script>
+
+  <script src="exporter.js"></script>
+
 </body>
 </html>
