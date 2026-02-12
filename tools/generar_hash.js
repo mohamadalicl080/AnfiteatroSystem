@@ -1,12 +1,14 @@
-// Uso: node tools/generar_hash.js "miPassword"
-// Imprime el PasswordHash para pegar en la hoja "Usuarios" (columna PasswordHash)
+// tools/generar_hash.js
+const bcrypt = require("bcryptjs");
 
-const { hashPassword } = require("../_lib/auth");
-
-const pwd = process.argv[2];
-if (!pwd) {
-  console.log('Uso: node tools/generar_hash.js "miPassword"');
+const password = process.argv[2];
+if (!password) {
+  console.log('Uso: node tools/generar_hash.js "tuPassword"');
   process.exit(1);
 }
 
-console.log(hashPassword(pwd));
+const saltRounds = 10;
+bcrypt.hash(password, saltRounds).then((hash) => {
+  console.log("Password:", password);
+  console.log("Hash:", hash);
+});

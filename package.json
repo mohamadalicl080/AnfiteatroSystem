@@ -4,6 +4,7 @@
   "private": true,
   "description": "Netlify Functions backend that uses Google Sheets as a database.",
   "dependencies": {
+    "bcryptjs": "^3.0.3",
     "googleapis": "^146.0.0"
   }
 }
