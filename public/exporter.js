@@ -1,27 +1,35 @@
 /**
  * Exporter (admin-only)
  * - Calls /.netlify/functions/export to fetch ALL sheets as JSON
- * - Generates XLSX / CSV / JSON in-browser (no extra backend deps)
+ * - Generates XLSX / CSV / PDF / JSON in-browser (no extra backend deps)
  *
- * Requirements:
- * - User must be logged in (token in localStorage/sessionStorage)
- * - Netlify env var AUTH_JWT_SECRET set (same used by login)
+ * Notes:
+ * - Robust token lookup across common keys.
+ * - Shows helpful alerts on errors (403/401/etc) instead of failing silently.
  */
-
 (function () {
   function getToken() {
-    // Try common keys
-    const keys = ["token", "authToken", "auth_token", "jwt", "anfiteatro_token"];
+    const keys = [
+      // common
+      "token", "authToken", "auth_token", "jwt",
+      // anfiteatro variants
+      "anfiteatro_token", "anfiteatroToken", "anf_token",
+      "anfiteatro_session", "anf_session", "session"
+    ];
+
     for (const k of keys) {
       const v = localStorage.getItem(k) || sessionStorage.getItem(k);
-      if (v) return v;
-    }
-    // Some apps store a "session" JSON
-    const sess = localStorage.getItem("session") || sessionStorage.getItem("session");
-    if (sess) {
+      if (!v) continue;
+
+      // Some apps store raw token; others store JSON.
+      if (typeof v === "string" && v.split(".").length === 3) return v;
+
       try {
-        const obj = JSON.parse(sess);
-        return obj.token || obj.jwt || obj.authToken || null;
+        const obj = JSON.parse(v);
+        const t =
+          obj.token || obj.jwt || obj.authToken || obj.access_token ||
+          (obj.session && (obj.session.token || obj.session.jwt));
+        if (t && String(t).split(".").length === 3) return t;
       } catch {}
     }
     return null;
@@ -29,28 +37,37 @@
 
   function loadScriptOnce(src) {
     return new Promise((resolve, reject) => {
-      if ([...document.scripts].some(s => s.src && s.src.includes(src))) return resolve();
+      if ([...document.scripts].some(s => (s.src || "").includes(src))) return resolve();
       const s = document.createElement("script");
       s.src = src;
-      s.onload = resolve;
-      s.onerror = reject;
+      s.async = true;
+      s.onload = () => resolve();
+      s.onerror = () => reject(new Error("No se pudo cargar: " + src));
       document.head.appendChild(s);
     });
   }
 
   async function fetchAllSheets() {
     const token = getToken();
-    if (!token) throw new Error("No hay sesión/token. Inicia sesión nuevamente.");
+    if (!token) throw new Error("No se encontró sesión/token. Cierra sesión e ingresa de nuevo.");
+
     const res = await fetch("/.netlify/functions/export", {
-      headers: { Authorization: "Bearer " + token }
+      method: "GET",
+      headers: { Authorization: "Bearer " + token },
     });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok || !data.ok) throw new Error(data.error || "No se pudo exportar");
+
+    let data = null;
+    const text = await res.text().catch(() => "");
+    try { data = JSON.parse(text); } catch { data = { ok: false, error: text || "Respuesta no JSON" }; }
+
+    if (!res.ok || !data.ok) {
+      const msg = data && data.error ? data.error : ("No se pudo exportar (HTTP " + res.status + ")");
+      throw new Error(msg);
+    }
     return data;
   }
 
   function sanitizeSheetName(name) {
-    // Excel limits: 31 chars, no : \ / ? * [ ]
     const cleaned = String(name || "Hoja").replace(/[:\\/?*\[\]]/g, " ").trim();
     return cleaned.slice(0, 31) || "Hoja";
   }
@@ -72,26 +89,25 @@
       if (/[",\n]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
       return s;
     };
-    const lines = [];
-    lines.push((header || []).map(esc).join(","));
-    for (const r of (rows || [])) lines.push((r || []).map(esc).join(","));
-    return lines.join("\n");
+    const out = [];
+    out.push((header || []).map(esc).join(","));
+    for (const r of rows || []) out.push((r || []).map(esc).join(","));
+    return out.join("\n");
   }
 
   async function exportAsXlsx(payload) {
-    // SheetJS (CDN)
     await loadScriptOnce("https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js");
-    const XLSX = window.XLSX;
-    const wb = XLSX.utils.book_new();
+    if (!window.XLSX) throw new Error("Librería XLSX no disponible (bloqueo de red/CSP).");
 
-    for (const s of payload.sheets) {
-      const aoa = [s.header || [], ...(s.rows || [])];
-      const ws = XLSX.utils.aoa_to_sheet(aoa);
-      XLSX.utils.book_append_sheet(wb, ws, sanitizeSheetName(s.title));
+    const wb = window.XLSX.utils.book_new();
+    for (const sh of payload.sheets || []) {
+      const title = sanitizeSheetName(sh.title);
+      const data = [sh.header || [], ...(sh.rows || [])];
+      const ws = window.XLSX.utils.aoa_to_sheet(data);
+      window.XLSX.utils.book_append_sheet(wb, ws, title);
     }
-
-    const wbout = XLSX.write(wb, { bookType: "xlsx", type: "array" });
-    downloadBlob(new Blob([wbout], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }),
+    const blob = window.XLSX.write(wb, { bookType: "xlsx", type: "array" });
+    downloadBlob(new Blob([blob], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }),
       `Anfiteatro_Export_${new Date().toISOString().slice(0,10)}.xlsx`);
   }
 
@@ -101,54 +117,50 @@
   }
 
   async function exportAsCsvZip(payload) {
-    // Zip all sheets as CSV files
     await loadScriptOnce("https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js");
-    const JSZip = window.JSZip;
-    const zip = new JSZip();
-    for (const s of payload.sheets) {
-      const csv = toCSV(s.header, s.rows);
-      zip.file(`${sanitizeSheetName(s.title)}.csv`, csv);
+    if (!window.JSZip) throw new Error("Librería JSZip no disponible (bloqueo de red/CSP).");
+
+    const zip = new window.JSZip();
+    for (const sh of payload.sheets || []) {
+      const title = sanitizeSheetName(sh.title);
+      const csv = toCSV(sh.header, sh.rows);
+      zip.file(`${title}.csv`, csv);
     }
-    const blob = await zip.generateAsync({ type: "blob" });
-    downloadBlob(blob, `Anfiteatro_Export_CSV_${new Date().toISOString().slice(0,10)}.zip`);
+    const content = await zip.generateAsync({ type: "blob" });
+    downloadBlob(content, `Anfiteatro_Export_${new Date().toISOString().slice(0,10)}_CSV.zip`);
   }
 
   async function exportAsPdf(payload) {
-    // Simple PDF summary per sheet (first 25 rows)
     await loadScriptOnce("https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js");
-    const { jsPDF } = window.jspdf;
-    const doc = new jsPDF({ unit: "pt", format: "a4" });
+    const jspdf = (window.jspdf && window.jspdf.jsPDF) ? window.jspdf.jsPDF : null;
+    if (!jspdf) throw new Error("Librería jsPDF no disponible (bloqueo de red/CSP).");
 
-    const margin = 40;
-    let y = margin;
-
+    const doc = new jspdf();
+    let y = 10;
     doc.setFontSize(14);
-    doc.text("Anfiteatro - Export", margin, y);
-    y += 18;
+    doc.text("Anfiteatro - Export PDF (resumen)", 10, y);
+    y += 8;
     doc.setFontSize(10);
-    doc.text(`Generado: ${new Date().toLocaleString()}`, margin, y);
-    y += 20;
+    doc.text("Generado: " + (payload.exportedAt || new Date().toISOString()), 10, y);
+    y += 10;
 
-    for (const s of payload.sheets) {
+    for (const sh of payload.sheets || []) {
+      if (y > 270) { doc.addPage(); y = 10; }
       doc.setFontSize(12);
-      doc.text(String(s.title), margin, y);
-      y += 14;
-
+      doc.text(String(sh.title || "Hoja"), 10, y);
+      y += 6;
       doc.setFontSize(9);
-      const header = (s.header || []).join(" | ");
-      doc.text(header.slice(0, 110), margin, y);
-      y += 12;
 
-      const rows = (s.rows || []).slice(0, 25);
+      const header = (sh.header || []).slice(0, 6);
+      const rows = (sh.rows || []).slice(0, 12).map(r => (r || []).slice(0, 6));
+      doc.text("Cols: " + header.join(" | "), 10, y);
+      y += 5;
       for (const r of rows) {
-        const line = (r || []).join(" | ");
-        doc.text(line.slice(0, 110), margin, y);
-        y += 11;
-        if (y > 780) { doc.addPage(); y = margin; }
+        if (y > 275) { doc.addPage(); y = 10; }
+        doc.text(r.join(" | "), 10, y);
+        y += 4;
       }
-
-      y += 14;
-      if (y > 780) { doc.addPage(); y = margin; }
+      y += 6;
     }
 
     const blob = doc.output("blob");
@@ -156,16 +168,26 @@
   }
 
   async function runExport() {
-    // Ask format
-    const fmt = (prompt("Formato exportación: xlsx / csv / pdf / json", "xlsx") || "xlsx").trim().toLowerCase();
-    const payload = await fetchAllSheets();
-    if (fmt === "xlsx") return exportAsXlsx(payload);
-    if (fmt === "json") return exportAsJson(payload);
-    if (fmt === "csv") return exportAsCsvZip(payload);
-    if (fmt === "pdf") return exportAsPdf(payload);
-    alert("Formato no válido. Usa: xlsx, csv, pdf o json.");
+    try {
+      const fmt = (prompt("Formato exportación: xlsx / csv / pdf / json", "xlsx") || "xlsx").trim().toLowerCase();
+      const allowed = ["xlsx", "csv", "pdf", "json"];
+      if (!allowed.includes(fmt)) {
+        alert("Formato no válido. Usa: xlsx, csv, pdf o json.");
+        return;
+      }
+
+      // Fetch first so we can fail fast with a clear message (401/403/etc.)
+      const payload = await fetchAllSheets();
+
+      if (fmt === "xlsx") return await exportAsXlsx(payload);
+      if (fmt === "json") return await exportAsJson(payload);
+      if (fmt === "csv") return await exportAsCsvZip(payload);
+      if (fmt === "pdf") return await exportAsPdf(payload);
+    } catch (err) {
+      console.error("Export error:", err);
+      alert("No se pudo exportar:\n" + (err && err.message ? err.message : String(err)));
+    }
   }
 
-  // Expose
   window.ANF_EXPORT = { runExport };
 })();
