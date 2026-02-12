@@ -1,0 +1,48 @@
+/*
+  UI patch (safe):
+  - Keeps the decorative icon inside KPI cards (no overflow outside).
+  - Widens the main containers a bit on large screens.
+*/
+
+/* 1) KPI cards: keep content clipped */
+.stat-card,
+.stat-card-green,
+.stat-card-orange,
+.stat-card-purple,
+.bg-gradient-to-br.from-emerald-500.to-teal-600 {
+  position: relative;
+  overflow: hidden;
+}
+
+/* 2) If the decorative icon is being positioned outside, force a safe placement.
+      This targets the LAST icon inside the KPI card header row.
+*/
+.stat-card .flex > i,
+.stat-card-green .flex > i,
+.stat-card-orange .flex > i,
+.stat-card-purple .flex > i,
+.bg-gradient-to-br.from-emerald-500.to-teal-600 .flex > i {
+  position: absolute;
+  top: 1.25rem;   /* ~20px */
+  right: 1.25rem; /* ~20px */
+  transform: none !important;
+  pointer-events: none;
+}
+
+/* 3) Make sure the text block doesn't get overlapped by the icon */
+.stat-card .flex > div,
+.stat-card-green .flex > div,
+.stat-card-orange .flex > div,
+.stat-card-purple .flex > div,
+.bg-gradient-to-br.from-emerald-500.to-teal-600 .flex > div {
+  padding-right: 3.25rem; /* space for icon */
+}
+
+/* 4) Wider layout on large screens (without changing your markup).
+      Tailwind max-w-7xl is 80rem; here we bump to 96rem (~1536px) for xl+.
+*/
+@media (min-width: 1280px) {
+  .max-w-7xl {
+    max-width: 96rem !important;
+  }
+}
