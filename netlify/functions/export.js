@@ -11,13 +11,6 @@ function withCors(resp) {
   return resp;
 }
 
-function getBearerToken(event) {
-  const h = event.headers || {};
-  const auth = h.authorization || h.Authorization || "";
-  const m = String(auth).match(/^Bearer\s+(.+)$/i);
-  return m ? m[1] : null;
-}
-
 function jsonResp(statusCode, body) {
   return {
     statusCode,
@@ -26,8 +19,14 @@ function jsonResp(statusCode, body) {
   };
 }
 
+function getBearerToken(event) {
+  const h = event.headers || {};
+  const auth = h.authorization || h.Authorization || "";
+  const m = String(auth).match(/^Bearer\s+(.+)$/i);
+  return m ? m[1] : null;
+}
+
 function b64urlDecodeToBuffer(str) {
-  // base64url -> base64
   const b64 = str.replace(/-/g, "+").replace(/_/g, "/") + "===".slice((str.length + 3) % 4);
   return Buffer.from(b64, "base64");
 }
@@ -43,12 +42,7 @@ function timingSafeEqual(a, b) {
   return crypto.timingSafeEqual(ba, bb);
 }
 
-/**
- * Minimal JWT verifier (HS256 only) to avoid extra dependencies.
- * - Validates signature using AUTH_JWT_SECRET
- * - Checks exp / nbf if present
- * Returns payload object.
- */
+// Minimal JWT verifier (HS256) to avoid external deps
 function verifyJwtHS256(token) {
   const secret = process.env.AUTH_JWT_SECRET;
   if (!secret) throw new Error("AUTH_JWT_SECRET not set");
@@ -58,54 +52,51 @@ function verifyJwtHS256(token) {
 
   const [h64, p64, s64] = parts;
   const header = b64urlDecodeJson(h64);
-
-  if (!header || header.alg !== "HS256") {
-    throw new Error("Unsupported token alg");
-  }
+  if (!header || header.alg !== "HS256") throw new Error("Unsupported token alg");
 
   const data = `${h64}.${p64}`;
   const sig = crypto.createHmac("sha256", secret).update(data).digest();
-  const sigB64Url = sig.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+  const sigB64Url = sig
+    .toString("base64")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/g, "");
 
-  if (!timingSafeEqual(sigB64Url, s64)) {
-    throw new Error("Bad signature");
-  }
+  if (!timingSafeEqual(sigB64Url, s64)) throw new Error("Bad signature");
 
   const payload = b64urlDecodeJson(p64);
   const now = Math.floor(Date.now() / 1000);
-
   if (payload.nbf && now < payload.nbf) throw new Error("Token not active");
   if (payload.exp && now >= payload.exp) throw new Error("Token expired");
 
   return payload;
 }
 
-async function fetchAllSheetsAsJson() {
-  const auth = await getSheetsClient();
+async function fetchAllSheetsAsAoa() {
+  const sheets = await getSheetsClient();
   const spreadsheetId = getSpreadsheetId();
-  const sheets = await auth.spreadsheets.get({ spreadsheetId });
-  const sheetTitles = (sheets.data.sheets || [])
+
+  // list sheets
+  const meta = await sheets.spreadsheets.get({ spreadsheetId });
+  const titles = (meta.data.sheets || [])
     .map((s) => s.properties && s.properties.title)
     .filter(Boolean);
 
-  const out = {};
-  for (const title of sheetTitles) {
-    const res = await auth.spreadsheets.values.get({
-      spreadsheetId,
-      range: `${title}!A:ZZ`,
-    });
+  const out = [];
+  for (const title of titles) {
+    // generous range; Sheets returns only used cells
+    const range = `${title}!A:ZZ`;
+    const res = await sheets.spreadsheets.values.get({ spreadsheetId, range });
     const values = res.data.values || [];
+
     if (!values.length) {
-      out[title] = { headers: [], rows: [] };
+      out.push({ title, header: [], rows: [] });
       continue;
     }
-    const headers = values[0].map((h) => String(h || "").trim());
-    const rows = values.slice(1).map((r) => {
-      const obj = {};
-      headers.forEach((h, i) => (obj[h] = r[i] ?? ""));
-      return obj;
-    });
-    out[title] = { headers, rows };
+
+    const header = values[0] || [];
+    const rows = values.slice(1) || [];
+    out.push({ title, header, rows });
   }
   return out;
 }
@@ -125,7 +116,7 @@ exports.handler = async (event) => {
     let payload;
     try {
       payload = verifyJwtHS256(token);
-    } catch (e) {
+    } catch {
       return withCors(jsonResp(401, { ok: false, error: "BAD_TOKEN" }));
     }
 
@@ -134,12 +125,10 @@ exports.handler = async (event) => {
       return withCors(jsonResp(403, { ok: false, error: "FORBIDDEN" }));
     }
 
-    const data = await fetchAllSheetsAsJson();
-    return withCors({
-      statusCode: 200,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ok: true, exportedAt: new Date().toISOString(), data }),
-    });
+    const sheets = await fetchAllSheetsAsAoa();
+    return withCors(
+      jsonResp(200, { ok: true, exportedAt: new Date().toISOString(), sheets })
+    );
   } catch (err) {
     return withCors(
       jsonResp(500, {
