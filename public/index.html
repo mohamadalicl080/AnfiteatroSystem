@@ -14,7 +14,15 @@
             <h3 class="text-2xl font-bold"><i class="fas fa-receipt mr-2"></i>Detalle del Movimiento</h3>
             <p class="text-sm text-purple-200 mt-1">Resumen tipo ticket</p>
           </div>
-          <button type="button" onclick="closeTicketModal()" class="text-white hover:text-gray-200 text-2xl"><i class="fas fa-times"></i></button>
+          
+          <div class="flex items-center gap-3">
+            <button id="printTicketBtn" type="button" class="text-white hover:text-gray-200 text-xl" title="Imprimir ticket">
+              <i class="fas fa-print"></i>
+            </button>
+            <button type="button" onclick="closeTicketModal()" class="text-white hover:text-gray-200 text-2xl" title="Cerrar">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -189,7 +197,12 @@
           <button onclick="openNewMovementModal()" class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2.5 rounded-lg font-semibold shadow-md transition duration-200 flex items-center">
             <i class="fas fa-plus mr-2"></i>Nuevo Movimiento
           </button>
-          <button id="exportButton" class="bg-green-600 hover:bg-green-700 text-white px-6 py-2.5 rounded-lg font-semibold shadow-md transition duration-200 flex items-center">
+          
+          <button id="printSelectedBtn" class="bg-white hover:bg-gray-50 text-gray-800 px-6 py-2.5 rounded-lg font-semibold shadow-md transition duration-200 flex items-center border border-gray-200">
+            <i class="fas fa-print mr-2 text-gray-700"></i>Imprimir
+            <span id="printSelectedCount" class="ml-2 text-xs bg-gray-200 px-2 py-0.5 rounded-full hidden">0</span>
+          </button>
+<button id="exportButton" class="bg-green-600 hover:bg-green-700 text-white px-6 py-2.5 rounded-lg font-semibold shadow-md transition duration-200 flex items-center">
             <i class="fas fa-download mr-2"></i>Exportar
             <span class="ml-2 text-xs bg-green-800 px-2 py-0.5 rounded-full">Admin</span>
           </button>
@@ -679,6 +692,8 @@
     // Paginación (solo pestaña Movimientos)
     const MOV_PAG = { pageSize: 5, page: 1, totalPages: 1, ordered: [] }; // ordered: últimos primero
     let EDITING_ID = null;
+    const PRINT_SEL = new Set();
+    let CURRENT_TICKET_ID = null;
 
     // Tabs
     const TAB_IDS = [
@@ -925,12 +940,172 @@
       document.getElementById("movementTicketModal")?.classList.add("hidden");
     }
 
+
+    function getMovimientoRowById(id) {
+      if (!MOV?.idx || MOV.idx.id < 0) return null;
+      return (MOV.rows || []).find(r => String(r[MOV.idx.id] || "") === String(id || ""));
+    }
+
+    function buildTicketHtmlFromRow(row) {
+      const get = (colIdx) => (colIdx >= 0 ? (row[colIdx] ?? "") : "");
+      const rawMonto = MOV.idx.monto >= 0 ? parseMoney(get(MOV.idx.monto)) : 0;
+      const tipo = String(get(MOV.idx.tipo) || "");
+      const montoFmt = (tipo === "Egreso" ? "-" : "") + formatCLP(Math.abs(rawMonto)).replace("-", "");
+
+      const fields = [
+        { key: "ID", value: get(MOV.idx.id) },
+        { key: "Fecha", value: formatFechaISO(get(MOV.idx.fecha)) },
+        { key: "Área", value: get(MOV.idx.area) },
+        { key: "Tipo", value: get(MOV.idx.tipo) },
+        { key: "Descripción", value: get(MOV.idx.descripcion) },
+        { key: "Monto", value: montoFmt },
+        { key: "Responsable", value: get(MOV.idx.responsable) },
+        { key: "Periodo", value: get(MOV.idx.periodo) },
+        { key: "Estado de Pago", value: get(MOV.idx.estadoPago) },
+        { key: "Local", value: get(MOV.idx.local) },
+        { key: "Empleado", value: get(MOV.idx.empleado) },
+        { key: "Arrendatario / Propietario", value: get(MOV.idx.arrendatarioPropietario) },
+        { key: "Proveedor / Empresa", value: get(MOV.idx.proveedorEmpresa) },
+        { key: "RUT", value: get(MOV.idx.rut) },
+        { key: "Método de Pago", value: get(MOV.idx.metodoPago) },
+        { key: "Fecha Vencimiento", value: formatFechaISO(get(MOV.idx.fechaVencimiento)) },
+        { key: "Número Comprobante", value: get(MOV.idx.numeroComprobante) },
+        { key: "Concepto", value: get(MOV.idx.concepto) },
+        { key: "Notas", value: get(MOV.idx.notas) },
+      ].filter(f => String(f.value || "").trim() !== "");
+
+      return `
+        <div class="flex items-start justify-between gap-4">
+          <div>
+            <div class="text-sm text-gray-500">Movimiento</div>
+            <div class="text-xl font-bold text-gray-900">${String(get(MOV.idx.area) || "Sin área")}</div>
+            <div class="mt-1 text-sm text-gray-600">${String(get(MOV.idx.descripcion) || "")}</div>
+          </div>
+          <div class="text-right">
+            <div class="text-sm text-gray-500">${String(get(MOV.idx.tipo) || "")}</div>
+            <div class="text-2xl font-extrabold ${tipo === "Ingreso" ? "text-green-600" : "text-red-600"}">${montoFmt}</div>
+          </div>
+        </div>
+
+        <div class="border-t border-gray-200 pt-4">
+          <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
+            ${fields.map(f => `
+              <div class="flex justify-between sm:block">
+                <dt class="text-sm font-semibold text-gray-600">${f.key}</dt>
+                <dd class="text-sm text-gray-900 sm:mt-1 break-words">${String(f.value)}</dd>
+              </div>
+            `).join("")}
+          </dl>
+        </div>
+      `;
+    }
+
+    function updatePrintSelectedUI() {
+      const badge = document.getElementById("printSelectedCount");
+      if (!badge) return;
+      const n = PRINT_SEL.size;
+      if (n > 0) {
+        badge.textContent = String(n);
+        badge.classList.remove("hidden");
+      } else {
+        badge.classList.add("hidden");
+      }
+    }
+
+    function buildPrintDocumentHTML(pagesHtml, title="Tickets") {
+      const baseStyles = `
+        <style>
+          @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+          * { font-family: 'Inter', sans-serif; }
+          .gradient-bg { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+          @media print {
+            .print-page { page-break-after: always; }
+            .print-page:last-child { page-break-after: auto; }
+          }
+        </style>
+      `;
+      return `<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>${title}</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link rel="stylesheet" href="ui-fixes.css">
+${baseStyles}
+</head>
+<body class="bg-white">
+  <div class="p-6">
+    ${pagesHtml}
+  </div>
+</body>
+</html>`;
+    }
+
+    function openPrintWindowWithHTML(docHtml) {
+      const w = window.open("", "_blank");
+      if (!w) {
+        alert("No se pudo abrir la ventana de impresión (pop-up bloqueado).");
+        return;
+      }
+      w.document.open();
+      w.document.write(docHtml);
+      w.document.close();
+      w.focus();
+      setTimeout(() => {
+        try { w.print(); } catch(e) {}
+      }, 700);
+    }
+
+    function wrapTicketForPrint(row) {
+      return `<div class="print-page">
+        <div class="max-w-xl mx-auto">
+          <div class="bg-white border border-gray-200 rounded-2xl">
+            <div class="gradient-bg text-white p-6 rounded-t-2xl">
+              <div class="flex justify-between items-center">
+                <div>
+                  <h3 class="text-2xl font-bold"><i class="fas fa-receipt mr-2"></i>Detalle del Movimiento</h3>
+                  <p class="text-sm text-purple-200 mt-1">Resumen tipo ticket</p>
+                </div>
+              </div>
+            </div>
+            <div class="p-6">
+              <div class="bg-gray-50 border border-gray-200 rounded-xl p-5">
+                ${buildTicketHtmlFromRow(row)}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>`;
+    }
+
+    function printTicketById(id) {
+      const row = getMovimientoRowById(id);
+      if (!row) { alert("No encontré el movimiento."); return; }
+      const page = wrapTicketForPrint(row);
+      openPrintWindowWithHTML(buildPrintDocumentHTML(page, "Ticket"));
+    }
+
+    function printSelectedTickets() {
+      if (PRINT_SEL.size === 0) {
+        alert("Selecciona uno o más movimientos para imprimir.");
+        return;
+      }
+      const ids = Array.from(PRINT_SEL);
+      const pages = ids.map(id => {
+        const row = getMovimientoRowById(id);
+        return row ? wrapTicketForPrint(row) : "";
+      }).join("");
+      openPrintWindowWithHTML(buildPrintDocumentHTML(pages, "Tickets"));
+    }
     function openTicketModalById(id) {
+      CURRENT_TICKET_ID = String(id || "");
       if (!MOV?.idx || MOV.idx.id < 0) {
         alert("No puedo mostrar el detalle: falta la columna ID.");
         return;
       }
-      const row = (MOV.rows || []).find(r => String(r[MOV.idx.id] || "") === String(id || ""));
+            const row = getMovimientoRowById(CURRENT_TICKET_ID);
       if (!row) {
         alert("No encontré el movimiento.");
         return;
@@ -968,31 +1143,7 @@
 
       const ticketEl = document.getElementById("ticketContent");
       if (ticketEl) {
-        ticketEl.innerHTML = `
-          <div class="flex items-start justify-between gap-4">
-            <div>
-              <div class="text-sm text-gray-500">Movimiento</div>
-              <div class="text-xl font-bold text-gray-900">${String(get(MOV.idx.area) || "Sin área")}</div>
-              <div class="mt-1 text-sm text-gray-600">${String(get(MOV.idx.descripcion) || "")}</div>
-            </div>
-            <div class="text-right">
-              <div class="text-sm text-gray-500">${String(get(MOV.idx.tipo) || "")}</div>
-              <div class="text-2xl font-extrabold ${isAnulado ? "text-gray-500" : (tipo === "Ingreso" ? "text-green-600" : "text-red-600")}">${montoFmt}</div>
-              ${isAnulado ? `<div class="mt-1 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-200 text-gray-700">ANULADO</div>` : ``}
-            </div>
-          </div>
-
-          <div class="border-t border-gray-200 pt-4">
-            <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
-              ${fields.map(f => `
-                <div class="flex justify-between sm:block">
-                  <dt class="text-sm font-semibold text-gray-600">${f.key}</dt>
-                  <dd class="text-sm text-gray-900 sm:mt-1 break-words">${String(f.value)}</dd>
-                </div>
-              `).join("")}
-            </dl>
-          </div>
-        `;
+                ticketEl.innerHTML = buildTicketHtmlFromRow(row);
       }
 
       const modal = document.getElementById("movementTicketModal");
@@ -1524,6 +1675,10 @@
           <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600"><i class="fas fa-user-circle mr-1"></i>${responsable || ""}</td>
           <td class="px-6 py-4 whitespace-nowrap text-sm">
             <button class="text-blue-600 hover:text-blue-900 mr-3" data-action="view" data-id="${id}" title="Ver ticket"><i class="fas fa-receipt"></i></button>
+            <button class="text-gray-700 hover:text-gray-900 mr-3" data-action="print" data-id="${id}" title="Imprimir ticket"><i class="fas fa-print"></i></button>
+            <label class="inline-flex items-center mr-2" title="Seleccionar para imprimir">
+              <input type="checkbox" class="ticket-select h-4 w-4" data-id="${id}" ${PRINT_SEL.has(String(id)) ? "checked" : ""}>
+            </label>
             ${(() => {
               const _canEdit = canEditRow(r);
               const _canDelete = canDeleteRow(r);
@@ -1539,7 +1694,8 @@
         `;
         tbody.appendChild(tr);
       });
-    }
+          updatePrintSelectedUI();
+}
 
     // Helpers para pestañas por área / resumen / alertas
     function signedAmount(tipo, monto, estadoPago) {
@@ -1601,6 +1757,10 @@
           <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600"><i class="fas fa-user-circle mr-1"></i>${responsable}</td>
           <td class="px-6 py-4 whitespace-nowrap text-sm">
             <button class="text-blue-600 hover:text-blue-900 mr-3" data-action="view" data-id="${id}" title="Ver ticket"><i class="fas fa-receipt"></i></button>
+            <button class="text-gray-700 hover:text-gray-900 mr-3" data-action="print" data-id="${id}" title="Imprimir ticket"><i class="fas fa-print"></i></button>
+            <label class="inline-flex items-center mr-2" title="Seleccionar para imprimir">
+              <input type="checkbox" class="ticket-select h-4 w-4" data-id="${id}" ${PRINT_SEL.has(String(id)) ? "checked" : ""}>
+            </label>
             ${(() => {
               const _canEdit = canEditRow(r);
               const _canDelete = canDeleteRow(r);
@@ -1973,9 +2133,36 @@
         const action = btn.dataset.action;
         const id = btn.dataset.id;
         if (action === "view") openTicketModalById(id);
+        if (action === "print") printTicketById(id);
         if (action === "edit") openEditModalById(id);
         if (action === "delete") deleteMovimientoById(id);
       });
+
+
+// Selección para imprimir (checkbox)
+document.body.addEventListener("change", (e) => {
+  const cb = e.target && e.target.closest && e.target.closest("input.ticket-select");
+  if (!cb) return;
+  const id = String(cb.dataset.id || "");
+  if (!id) return;
+  if (cb.checked) PRINT_SEL.add(id); else PRINT_SEL.delete(id);
+  updatePrintSelectedUI();
+});
+
+// Botón imprimir seleccionados
+const printSelectedBtn = document.getElementById("printSelectedBtn");
+if (printSelectedBtn) {
+  printSelectedBtn.addEventListener("click", () => printSelectedTickets());
+}
+
+// Botón imprimir en modal ticket
+const printTicketBtn = document.getElementById("printTicketBtn");
+if (printTicketBtn) {
+  printTicketBtn.addEventListener("click", () => {
+    if (!CURRENT_TICKET_ID) { alert("Abre un ticket primero."); return; }
+    printTicketById(CURRENT_TICKET_ID);
+  });
+}
 
       // Export
       const exportButton = document.getElementById("exportButton");
@@ -1999,3 +2186,4 @@
 
 </body>
 </html>
+
