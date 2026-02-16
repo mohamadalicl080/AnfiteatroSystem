@@ -14,8 +14,7 @@
             <h3 class="text-2xl font-bold"><i class="fas fa-receipt mr-2"></i>Detalle del Movimiento</h3>
             <p class="text-sm text-purple-200 mt-1">Resumen tipo ticket</p>
           </div>
-                    <button type="button" id="printTicketButton" class="text-white hover:text-gray-200 text-xl mr-3" title="Imprimir ticket"><i class="fas fa-print"></i></button>
-<button type="button" onclick="closeTicketModal()" class="text-white hover:text-gray-200 text-2xl"><i class="fas fa-times"></i></button>
+          <button type="button" onclick="closeTicketModal()" class="text-white hover:text-gray-200 text-2xl"><i class="fas fa-times"></i></button>
         </div>
       </div>
 
@@ -190,11 +189,10 @@
           <button onclick="openNewMovementModal()" class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2.5 rounded-lg font-semibold shadow-md transition duration-200 flex items-center">
             <i class="fas fa-plus mr-2"></i>Nuevo Movimiento
           </button>
-          <button id="printSelectedButton" class="bg-white hover:bg-gray-50 text-gray-800 px-6 py-2.5 rounded-lg font-semibold shadow-md border border-gray-200 transition duration-200 flex items-center opacity-50 cursor-not-allowed" disabled>
+          <button id="printSelectedButton" type="button" class="bg-white border border-gray-300 text-gray-700 px-6 py-2.5 rounded-lg font-semibold shadow-md transition duration-200 flex items-center opacity-50 cursor-not-allowed" disabled>
             <i class="fas fa-print mr-2"></i>Imprimir
-            <span id="printSelectedCount" class="ml-2 text-xs font-bold bg-gray-200 text-gray-700 px-2 py-1 rounded-full hidden">0</span>
+            <span id="printSelectedCount" class="ml-2 inline-flex items-center justify-center text-xs font-bold bg-purple-100 text-purple-700 rounded-full px-2 py-0.5 hidden">0</span>
           </button>
-
           <button id="exportButton" class="bg-green-600 hover:bg-green-700 text-white px-6 py-2.5 rounded-lg font-semibold shadow-md transition duration-200 flex items-center">
             <i class="fas fa-download mr-2"></i>Exportar
             <span class="ml-2 text-xs bg-green-800 px-2 py-0.5 rounded-full">Admin</span>
@@ -237,7 +235,9 @@
         <table class="min-w-full divide-y divide-gray-200">
           <thead class="bg-gray-100">
             <tr>
-              <th class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider"><input id="movSelectAll" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500" title="Seleccionar todos"></th>
+              <th class="px-3 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                <input id="movSelectAll" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500">
+              </th>
               <th class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Fecha</th>
               <th class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Área</th>
               <th class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Tipo</th>
@@ -684,10 +684,7 @@
 
     const MOV = { header: [], rows: [], idx: null };
     // Paginación (solo pestaña Movimientos)
-    const MOV_PAG = { pageSize: 5, page: 1, totalPages: 1, ordered: [] }; // ordered: últimos pr
-    // Impresión de tickets (selección múltiple)
-    const PRINT_SEL = new Set();
-    let LAST_TICKET_ID = null; // ordered: últimos primero
+    const MOV_PAG = { pageSize: 5, page: 1, totalPages: 1, ordered: [] }; // ordered: últimos primero
     let EDITING_ID = null;
 
     // Tabs
@@ -1010,173 +1007,6 @@
     }
 
 
-
-    // ===== Impresión de tickets (ventana nueva + window.print) =====
-    function getMovimientoRowById(id) {
-      if (!MOV?.idx || MOV.idx.id < 0) return null;
-      return (MOV.rows || []).find(r => String(r[MOV.idx.id] || "") === String(id || "")) || null;
-    }
-
-    function buildTicketInnerHTMLFromRow(row) {
-      const get = (colIdx) => (colIdx >= 0 ? (row[colIdx] ?? "") : "");
-      const rawMonto = MOV.idx.monto >= 0 ? parseMoney(get(MOV.idx.monto)) : 0;
-      const tipo = String(get(MOV.idx.tipo) || "");
-      const estadoPagoRaw = String(get(MOV.idx.estadoPago) || "");
-      const isAnulado = isAnuladoEstado(estadoPagoRaw);
-      const montoBase = isAnulado ? 0 : Math.abs(rawMonto);
-      const montoFmt = (tipo === "Egreso" ? "-" : "") + formatCLP(montoBase).replace("-", "");
-
-      const fields = [
-        { key: "ID", value: get(MOV.idx.id) },
-        { key: "Fecha", value: formatFechaISO(get(MOV.idx.fecha)) },
-        { key: "Área", value: get(MOV.idx.area) },
-        { key: "Tipo", value: get(MOV.idx.tipo) },
-        { key: "Descripción", value: get(MOV.idx.descripcion) },
-        { key: "Monto", value: montoFmt },
-        { key: "Responsable", value: get(MOV.idx.responsable) },
-        { key: "Periodo", value: get(MOV.idx.periodo) },
-        { key: "Estado de Pago", value: get(MOV.idx.estadoPago) },
-        { key: "Local", value: get(MOV.idx.local) },
-        { key: "Empleado", value: get(MOV.idx.empleado) },
-        { key: "Arrendatario / Propietario", value: get(MOV.idx.arrendatarioPropietario) },
-        { key: "Proveedor / Empresa", value: get(MOV.idx.proveedorEmpresa) },
-        { key: "RUT", value: get(MOV.idx.rut) },
-        { key: "Método de Pago", value: get(MOV.idx.metodoPago) },
-        { key: "Fecha Vencimiento", value: formatFechaISO(get(MOV.idx.fechaVencimiento)) },
-        { key: "Número Comprobante", value: get(MOV.idx.numeroComprobante) },
-        { key: "Concepto", value: get(MOV.idx.concepto) },
-        { key: "Notas", value: get(MOV.idx.notas) },
-      ].filter(f => String(f.value || "").trim() !== "");
-
-      return `
-          <div class="flex items-start justify-between gap-4">
-            <div>
-              <div class="text-sm text-gray-500">Movimiento</div>
-              <div class="text-xl font-bold text-gray-900">${String(get(MOV.idx.area) || "Sin área")}</div>
-              <div class="mt-1 text-sm text-gray-600">${String(get(MOV.idx.descripcion) || "")}</div>
-            </div>
-            <div class="text-right">
-              <div class="text-sm text-gray-500">${String(get(MOV.idx.tipo) || "")}</div>
-              <div class="text-2xl font-extrabold ${isAnulado ? "text-gray-500" : (tipo === "Ingreso" ? "text-green-600" : "text-red-600")}">${montoFmt}</div>
-              ${isAnulado ? `<div class="mt-1 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-gray-200 text-gray-700">ANULADO</div>` : ``}
-            </div>
-          </div>
-
-          <div class="border-t border-gray-200 pt-4">
-            <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
-              ${fields.map(f => `
-                <div class="flex justify-between sm:block">
-                  <dt class="text-sm font-semibold text-gray-600">${f.key}</dt>
-                  <dd class="text-sm text-gray-900 sm:mt-1 break-words">${String(f.value)}</dd>
-                </div>
-              `).join("")}
-            </dl>
-          </div>
-      `;
-    }
-
-    function wrapTicketForPrint(innerHtml) {
-      return `
-        <div class="bg-white rounded-2xl shadow-2xl max-w-xl w-full mx-auto overflow-hidden border border-gray-200">
-          <div class="gradient-bg text-white p-6 rounded-t-2xl">
-            <h3 class="text-2xl font-bold"><i class="fas fa-receipt mr-2"></i>Detalle del Movimiento</h3>
-            <p class="text-sm text-purple-200 mt-1">Resumen tipo ticket</p>
-          </div>
-          <div class="p-6">
-            <div class="bg-gray-50 border border-gray-200 rounded-xl p-5">
-              ${innerHtml}
-            </div>
-          </div>
-        </div>
-      `;
-    }
-
-    function buildPrintDocumentHTML(pagesHtml, title = "Ticket") {
-      const inlineStyles = Array.from(document.querySelectorAll("style")).map(s => s.innerHTML).join("\n");
-      const hasUiFixes = !!document.querySelector('link[rel="stylesheet"][href*="ui-fixes.css"]');
-      const faHref = (document.querySelector('link[rel="stylesheet"][href*="font-awesome"]') || {}).href || "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css";
-
-      return `<!doctype html>
-<html lang="es">
-<head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>${title}</title>
-  <link rel="stylesheet" href="${faHref}">
-  ${hasUiFixes ? `<link rel="stylesheet" href="ui-fixes.css">` : ``}
-  <script src="https://cdn.tailwindcss.com"></script>
-  <style>
-    ${inlineStyles}
-    @page { size: A4; margin: 12mm; }
-    body { background: #fff; }
-    .print-page { page-break-after: always; }
-    .print-page:last-child { page-break-after: auto; }
-  </style>
-</head>
-<body class="bg-white">
-  <div class="p-4 space-y-6">
-    ${pagesHtml}
-  </div>
-</body>
-</html>`;
-    }
-
-    function openPrintWindowWithHTML(docHtml) {
-      const w = window.open("", "_blank");
-      if (!w) { alert("No se pudo abrir la ventana de impresión (pop-up bloqueado)."); return; }
-      w.document.open();
-      w.document.write(docHtml);
-      w.document.close();
-      w.focus();
-      setTimeout(() => { try { w.print(); } catch (e) {} }, 900);
-    }
-
-    function printTicketById(id) {
-      const row = getMovimientoRowById(id);
-      if (!row) { alert("No encontré el movimiento."); return; }
-      const inner = buildTicketInnerHTMLFromRow(row);
-      const page = `<div class="print-page">${wrapTicketForPrint(inner)}</div>`;
-      openPrintWindowWithHTML(buildPrintDocumentHTML(page, "Ticket"));
-    }
-
-    function updatePrintSelectedUI() {
-      const btn = document.getElementById("printSelectedButton");
-      const badge = document.getElementById("printSelectedCount");
-      if (!btn || !badge) return;
-      const n = PRINT_SEL.size;
-      if (n > 0) {
-        btn.disabled = false;
-        btn.classList.remove("opacity-50", "cursor-not-allowed");
-        badge.textContent = String(n);
-        badge.classList.remove("hidden");
-      } else {
-        btn.disabled = true;
-        btn.classList.add("opacity-50", "cursor-not-allowed");
-        badge.classList.add("hidden");
-      }
-      // actualizar estado "select all" en tabla principal
-      const selAll = document.getElementById("movSelectAll");
-      const checks = Array.from(document.querySelectorAll('input.movRowSelect[data-id]'));
-      if (selAll && checks.length) {
-        const allChecked = checks.every(c => c.checked);
-        const noneChecked = checks.every(c => !c.checked);
-        selAll.indeterminate = !allChecked && !noneChecked;
-        selAll.checked = allChecked;
-      }
-    }
-
-    function printSelectedTickets() {
-      const ids = Array.from(PRINT_SEL);
-      if (!ids.length) { alert("Selecciona al menos un movimiento para imprimir."); return; }
-      const pages = ids.map((id) => {
-        const row = getMovimientoRowById(id);
-        if (!row) return "";
-        const inner = buildTicketInnerHTMLFromRow(row);
-        return `<div class="print-page">${wrapTicketForPrint(inner)}</div>`;
-      }).filter(Boolean).join("\n");
-      if (!pages) { alert("No pude preparar los tickets para imprimir."); return; }
-      openPrintWindowWithHTML(buildPrintDocumentHTML(pages, "Tickets"));
-    }
     async function apiFetch(path, options = {}) {
       const res = await fetch(path, {
         ...options,
@@ -1691,7 +1521,7 @@
         const tr = document.createElement("tr");
         tr.className = "hover:bg-gray-50 transition duration-150";
         tr.innerHTML = `
-          <td class="px-6 py-4 whitespace-nowrap"><input type="checkbox" class="movRowSelect h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500" data-id="${id}" ${PRINT_SEL.has(String(id)) ? "checked" : ""}></td>
+          <td class="px-3 py-4 whitespace-nowrap text-sm text-gray-900"><input type="checkbox" class="movRowSelect h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500" data-id="${id}"></td>
           <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${formatFechaISO(fecha)}</td>
           <td class="px-6 py-4 whitespace-nowrap"><span class="px-3 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">${area || ""}</span></td>
           <td class="px-6 py-4 whitespace-nowrap">${tipoBadge}</td>
@@ -1702,8 +1532,7 @@
           <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600"><i class="fas fa-user-circle mr-1"></i>${responsable || ""}</td>
           <td class="px-6 py-4 whitespace-nowrap text-sm">
             <button class="text-blue-600 hover:text-blue-900 mr-3" data-action="view" data-id="${id}" title="Ver ticket"><i class="fas fa-receipt"></i></button>
-            <button class="text-gray-700 hover:text-gray-900 mr-3" data-action="print" data-id="${id}" title="Imprimir ticket"><i class="fas fa-print"></i></button>
-            
+            <button class="text-gray-600 hover:text-gray-900 mr-3" data-action="print" data-id="${id}" title="Imprimir"><i class="fas fa-print"></i></button>
             ${(() => {
               const _canEdit = canEditRow(r);
               const _canDelete = canDeleteRow(r);
@@ -2152,11 +1981,11 @@
         if (!btn) return;
         const action = btn.dataset.action;
         const id = btn.dataset.id;
-        if (action === "view") { LAST_TICKET_ID = id; openTicketModalById(id); }
-        if (action === "print") { printTicketById(id); }
+        if (action === "view") openTicketModalById(id);
         if (action === "edit") openEditModalById(id);
         if (action === "delete") deleteMovimientoById(id);
-      });
+              if (action === "print") printTicketById(id);
+});
 
       // Export
       const exportButton = document.getElementById("exportButton");
@@ -2170,55 +1999,7 @@
         }
       }
 
-      
-      // Impresión: botón modal + selección múltiple
-      const printTicketBtn = document.getElementById("printTicketButton");
-      if (printTicketBtn) {
-        printTicketBtn.addEventListener("click", () => {
-          if (!LAST_TICKET_ID) {
-            alert("Abre un ticket primero para imprimirlo.");
-            return;
-          }
-          printTicketById(LAST_TICKET_ID);
-        });
-      }
-
-      const printSelectedBtn = document.getElementById("printSelectedButton");
-      if (printSelectedBtn) {
-        printSelectedBtn.addEventListener("click", () => {
-          printSelectedTickets();
-        });
-      }
-
-      // Select all (solo tabla principal)
-      const selAll = document.getElementById("movSelectAll");
-      if (selAll) {
-        selAll.addEventListener("change", () => {
-          const checks = Array.from(document.querySelectorAll('input.movRowSelect[data-id]'));
-          checks.forEach(c => {
-            c.checked = selAll.checked;
-            const id = String(c.dataset.id || "");
-            if (!id) return;
-            if (selAll.checked) PRINT_SEL.add(id);
-            else PRINT_SEL.delete(id);
-          });
-          updatePrintSelectedUI();
-        });
-      }
-
-      // Delegación para checkboxes
-      document.body.addEventListener("change", (e) => {
-        const cb = e.target.closest && e.target.closest("input.movRowSelect");
-        if (!cb) return;
-        const id = String(cb.dataset.id || "");
-        if (!id) return;
-        if (cb.checked) PRINT_SEL.add(id);
-        else PRINT_SEL.delete(id);
-        updatePrintSelectedUI();
-      });
-
-      updatePrintSelectedUI();
-// Close modal on overlay click
+      // Close modal on overlay click
       const modal = document.getElementById('newMovementModal');
       if (modal) modal.addEventListener('click', function(e) { if (e.target === this) closeModal(); });
     });
@@ -2226,5 +2007,7 @@
 
   <script src="exporter.js"></script>
 
+  <script src="print-tickets.js"></script>
+  
 </body>
 </html>
