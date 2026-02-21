@@ -595,6 +595,72 @@
           </select>
         </div>
 
+
+        <!-- 🤝 Convenio (cuentas por cobrar + abonos) -->
+        <div class="pt-1">
+          <button id="mvConvenioToggle" type="button"
+            class="w-full flex items-center justify-between px-4 py-3 border-2 border-dashed border-purple-300 rounded-lg bg-purple-50 hover:bg-purple-100 transition">
+            <span class="font-semibold text-purple-800"><i class="fas fa-handshake mr-2"></i>Convenio</span>
+            <span id="mvConvenioToggleHint" class="text-xs text-purple-700">Crear / Abonar</span>
+          </button>
+
+          <div id="mvConvenioPanel" class="hidden mt-3 p-4 border border-purple-200 rounded-lg bg-white">
+            <div class="flex items-center gap-3 mb-3">
+              <label class="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                <input type="radio" name="convenioMode" value="create" class="h-4 w-4" checked>
+                Crear convenio
+              </label>
+              <label class="flex items-center gap-2 text-sm font-semibold text-gray-700">
+                <input type="radio" name="convenioMode" value="abono" class="h-4 w-4">
+                Abonar a convenio existente
+              </label>
+              <button id="mvConvenioClear" type="button" class="ml-auto text-xs text-gray-500 hover:text-gray-700">
+                Quitar convenio
+              </button>
+            </div>
+
+            <div id="mvConvenioCreateFields" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-2">Monto total debido</label>
+                <div class="relative">
+                  <span class="absolute left-4 top-3.5 text-gray-500 font-semibold">$</span>
+                  <input id="mvConvenioTotal" type="number" min="0" placeholder="0"
+                    class="w-full pl-8 pr-4 py-3 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition duration-200">
+                </div>
+                <p class="text-xs text-gray-500 mt-1">Este monto NO se suma a Ingresos (se registra con $0). Los abonos sí.</p>
+              </div>
+
+              <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-2">Identificación (opcional)</label>
+                <input id="mvConvenioPersona" type="text" placeholder="Ej: Juan Pérez / Local 12 / Empresa X"
+                  class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition duration-200">
+                <p class="text-xs text-gray-500 mt-1">Si lo dejas vacío, se usará Arrendatario/Proveedor/Empleado/Local si existe.</p>
+              </div>
+            </div>
+
+            <div id="mvConvenioAbonoFields" class="hidden grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div class="md:col-span-2">
+                <label class="block text-sm font-semibold text-gray-700 mb-2">Selecciona convenio</label>
+                <select id="mvConvenioSelect"
+                  class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition duration-200">
+                  <option value="">Cargando convenios...</option>
+                </select>
+              </div>
+
+              <div class="md:col-span-2">
+                <div class="flex items-center justify-between">
+                  <div class="text-sm text-gray-700">
+                    <span class="font-semibold">Pendiente:</span> <span id="mvConvenioPendiente" class="text-purple-700 font-bold">$0</span>
+                  </div>
+                  <div class="text-xs text-gray-500" id="mvConvenioSelectedLabel">—</div>
+                </div>
+              </div>
+            </div>
+
+            <input id="mvConvenioInternal" type="hidden" value="off">
+          </div>
+        </div>
+
         <!-- ✅ Detalles adicionales (RESTAURADO) -->
         <div class="pt-2">
           <h4 class="text-sm font-bold text-gray-700 flex items-center gap-2">
@@ -954,8 +1020,196 @@
         if (el) el.value = "";
       });
 
+      clearConvenioUI();
+
       document.getElementById('newMovementModal').classList.remove('hidden');
     }
+
+    // =============================
+    // 🤝 UI Convenio
+    // =============================
+    function getConvenioUI() {
+      return {
+        toggle: document.getElementById("mvConvenioToggle"),
+        hint: document.getElementById("mvConvenioToggleHint"),
+        panel: document.getElementById("mvConvenioPanel"),
+        internal: document.getElementById("mvConvenioInternal"),
+        clear: document.getElementById("mvConvenioClear"),
+        total: document.getElementById("mvConvenioTotal"),
+        persona: document.getElementById("mvConvenioPersona"),
+        sel: document.getElementById("mvConvenioSelect"),
+        pendiente: document.getElementById("mvConvenioPendiente"),
+        selLabel: document.getElementById("mvConvenioSelectedLabel"),
+        createFields: document.getElementById("mvConvenioCreateFields"),
+        abonoFields: document.getElementById("mvConvenioAbonoFields"),
+        monto: document.getElementById("mvMonto"),
+        estado: document.getElementById("mvEstadoPago"),
+        tipoIngreso: document.getElementById("mvTipoIngreso"),
+      };
+    }
+
+    function setConvenioInternal(on) {
+      const ui = getConvenioUI();
+      if (ui.internal) ui.internal.value = on ? "on" : "off";
+    }
+
+    function setConvenioMode(mode) {
+      const ui = getConvenioUI();
+      const isAbono = mode === "abono";
+
+      if (ui.createFields) ui.createFields.classList.toggle("hidden", isAbono);
+      if (ui.abonoFields) ui.abonoFields.classList.toggle("hidden", !isAbono);
+
+      // Forzar tipo ingreso (tiene más sentido para convenio/abono)
+      if (ui.tipoIngreso) ui.tipoIngreso.checked = true;
+
+      // Estado por defecto
+      if (ui.estado) ui.estado.value = isAbono ? "Pagado" : (ui.estado.value || "Pendiente");
+
+      // Monto: convenio = 0 (no impacta ingresos), abono = editable
+      if (ui.monto) {
+        if (!isAbono) {
+          ui.monto.value = "0";
+          ui.monto.disabled = true;
+        } else {
+          ui.monto.disabled = false;
+        }
+      }
+    }
+
+    function clearConvenioUI({ keepUserNotes = true } = {}) {
+      const ui = getConvenioUI();
+      setConvenioInternal(false);
+      ui.panel?.classList.add("hidden");
+      ui.hint && (ui.hint.textContent = "Crear / Abonar");
+
+      // reset radios
+      const rCreate = document.querySelector('input[name="convenioMode"][value="create"]');
+      const rAbono = document.querySelector('input[name="convenioMode"][value="abono"]');
+      if (rCreate) rCreate.checked = true;
+      if (rAbono) rAbono.checked = false;
+
+      if (ui.total) ui.total.value = "";
+      if (ui.persona) ui.persona.value = "";
+      if (ui.sel) ui.sel.value = "";
+      if (ui.pendiente) ui.pendiente.textContent = formatCLP(0);
+      if (ui.selLabel) ui.selLabel.textContent = "—";
+
+      // re-enable monto for normal movimientos
+      if (ui.monto) ui.monto.disabled = false;
+    }
+
+    function refreshConvenioSelectOptions({ selectedId = "" } = {}) {
+      const ui = getConvenioUI();
+      if (!ui.sel) return;
+
+      const idx = buildConvenioIndex();
+      const convenios = Array.from(idx.values())
+        .filter(c => (Number(c.total) || 0) > 0)
+        .sort((a,b) => (a.pendiente - b.pendiente)); // opcional
+
+      ui.sel.innerHTML = "";
+      const opt0 = document.createElement("option");
+      opt0.value = "";
+      opt0.textContent = convenios.length ? "Seleccione un convenio..." : "No hay convenios pendientes";
+      ui.sel.appendChild(opt0);
+
+      convenios.forEach(c => {
+        const o = document.createElement("option");
+        o.value = c.id;
+        o.textContent = convenioLabel(c);
+        ui.sel.appendChild(o);
+      });
+
+      if (selectedId) ui.sel.value = selectedId;
+      updateConvenioSelectedInfo();
+    }
+
+    function updateConvenioSelectedInfo() {
+      const ui = getConvenioUI();
+      if (!ui.sel || !ui.pendiente) return;
+
+      const id = ui.sel.value || "";
+      const idx = buildConvenioIndex();
+      const c = idx.get(id);
+
+      if (!c) {
+        ui.pendiente.textContent = formatCLP(0);
+        if (ui.selLabel) ui.selLabel.textContent = "—";
+        return;
+      }
+
+      ui.pendiente.textContent = formatCLP(c.pendiente);
+      if (ui.selLabel) ui.selLabel.textContent = `${c.persona || c.rut || ("ID "+c.id)} · ${c.abonosCount} abono(s)`;
+
+      // sugerir máximo
+      if (ui.monto && !ui.monto.disabled) {
+        ui.monto.placeholder = String(Math.max(0, Number(c.pendiente) || 0));
+      }
+
+      // si aún no eligió área/desc, prellenar suave
+      const areaEl = document.getElementById("mvArea");
+      const descEl = document.getElementById("mvDescripcion");
+      if (areaEl && !areaEl.value) {
+        // map reverse a select values
+        const rev = {
+          "Gastos Comunes":"gastos-comunes",
+          "Arriendos":"arriendos",
+          "Proveedores":"proveedores",
+          "Empleados":"empleados",
+          "Caja Chica":"caja-chica",
+          "Otros":"otros"
+        };
+        areaEl.value = rev[c.area] || areaEl.value;
+      }
+      if (descEl && !descEl.value) descEl.value = `Abono convenio (${c.persona || c.rut || c.id})`;
+    }
+
+    function openAbonoModalByConvenioId(convenioId) {
+      openNewMovementModal();
+
+      const ui = getConvenioUI();
+      ui.panel?.classList.remove("hidden");
+      setConvenioInternal(true);
+
+      const rAbono = document.querySelector('input[name="convenioMode"][value="abono"]');
+      if (rAbono) rAbono.checked = true;
+      setConvenioMode("abono");
+      refreshConvenioSelectOptions({ selectedId: String(convenioId || "") });
+    }
+
+    function initConvenioEvents() {
+      const ui = getConvenioUI();
+      if (!ui.toggle) return;
+
+      ui.toggle.addEventListener("click", () => {
+        const isHidden = ui.panel?.classList.contains("hidden");
+        if (isHidden) {
+          ui.panel?.classList.remove("hidden");
+          setConvenioInternal(true);
+          ui.hint && (ui.hint.textContent = "Activo");
+          // cargar convenios para abono
+          refreshConvenioSelectOptions();
+          setConvenioMode(document.querySelector('input[name="convenioMode"]:checked')?.value || "create");
+        } else {
+          clearConvenioUI();
+        }
+      });
+
+      ui.clear?.addEventListener("click", () => clearConvenioUI());
+
+      document.querySelectorAll('input[name="convenioMode"]').forEach(r => {
+        r.addEventListener("change", () => {
+          setConvenioInternal(true);
+          const mode = document.querySelector('input[name="convenioMode"]:checked')?.value || "create";
+          setConvenioMode(mode);
+          if (mode === "abono") refreshConvenioSelectOptions();
+        });
+      });
+
+      ui.sel?.addEventListener("change", updateConvenioSelectedInfo);
+    }
+
     function closeModal() { document.getElementById('newMovementModal').classList.add('hidden'); }
 
     function closeTicketModal() {
@@ -1000,7 +1254,33 @@
         { key: "Fecha Vencimiento", value: formatFechaISO(get(MOV.idx.fechaVencimiento)) },
         { key: "Número Comprobante", value: get(MOV.idx.numeroComprobante) },
         { key: "Concepto", value: get(MOV.idx.concepto) },
-        { key: "Notas", value: get(MOV.idx.notas) },
+        { key: "Notas", value: (()=>{ const sp = splitNotasMeta(get(MOV.idx.notas)); return sp.userNotes; })() },
+        ...(()=>{
+          const sp = splitNotasMeta(get(MOV.idx.notas));
+          if (!sp.meta) return [];
+          if (sp.meta.kind === "convenio") {
+            const total = Number(sp.meta.total)||0;
+            const idx = buildConvenioIndex();
+            const info = idx.get(String(get(MOV.idx.id)||""));
+            const pend = info ? info.pendiente : Math.max(0,total);
+            return [
+              { key: "Convenio", value: "Sí" },
+              { key: "Total debido", value: formatCLP(total) },
+              { key: "Pendiente", value: formatCLP(pend) },
+              { key: "Pagado", value: formatCLP(total - pend) },
+            ];
+          }
+          if (sp.meta.kind === "abono") {
+            const cid = String(sp.meta.convenioId||"");
+            const idx = buildConvenioIndex();
+            const c = idx.get(cid);
+            return [
+              { key: "Abono a", value: c ? (c.persona || c.rut || cid) : cid },
+              { key: "Convenio ID", value: cid },
+            ];
+          }
+          return [];
+        })()
       ].filter(f => String(f.value || "").trim() !== "");
 
       const ticketEl = document.getElementById("ticketContent");
@@ -1156,6 +1436,92 @@
     }
 
 
+
+    // =============================
+    // 🤝 Convenios (metadatos en "Notas")
+    // =============================
+    const ANF_META_TAG = '[[ANF_META]]';
+
+    function splitNotasMeta(raw) {
+      const txt = String(raw ?? "");
+      const idx = txt.lastIndexOf(ANF_META_TAG);
+      if (idx < 0) return { userNotes: txt.trim(), meta: null };
+      const userNotes = txt.slice(0, idx).trim();
+      const metaStr = txt.slice(idx + ANF_META_TAG.length).trim();
+      try {
+        const meta = JSON.parse(metaStr);
+        return { userNotes, meta };
+      } catch {
+        return { userNotes: txt.trim(), meta: null };
+      }
+    }
+
+    function mergeNotasMeta(userNotes, meta) {
+      const base = String(userNotes ?? "").trim();
+      if (!meta) return base;
+      const metaStr = ANF_META_TAG + JSON.stringify(meta);
+      return base ? (base + "\n\n" + metaStr) : metaStr;
+    }
+
+    function getNotasFromRow(row) {
+      const i = MOV.idx?.notas ?? findCol(MOV.header, ["Notas","Nota"]);
+      return i >= 0 ? (row[i] ?? "") : "";
+    }
+
+    function getIdFromRow(row) {
+      const i = MOV.idx?.id ?? findCol(MOV.header, ["ID"]);
+      return i >= 0 ? String(row[i] ?? "") : "";
+    }
+
+    function isConvenioMeta(meta) { return meta && meta.kind === "convenio"; }
+    function isAbonoMeta(meta) { return meta && meta.kind === "abono"; }
+
+    function buildConvenioIndex() {
+      // Devuelve: Map(convenioId -> { id, total, pagado, pendiente, persona, rut, area, creado, abonosCount })
+      const map = new Map();
+      const abonosByConv = new Map();
+
+      for (const r of (MOV.rows || [])) {
+        const estado = (MOV.idx?.estadoPago ?? -1) >= 0 ? (r[MOV.idx.estadoPago] || "") : "";
+        if (isAnuladoEstado(estado)) continue;
+
+        const { meta } = splitNotasMeta(getNotasFromRow(r));
+        if (!meta) continue;
+
+        if (isConvenioMeta(meta)) {
+          const id = getIdFromRow(r);
+          const total = Number(meta.total) || 0;
+          const persona = String(meta.persona || "").trim();
+          const rut = String(meta.rut || "").trim();
+          const area = String(meta.area || (MOV.idx?.area>=0 ? (r[MOV.idx.area]||"") : "") || "").trim();
+          const creado = String(meta.createdAt || (MOV.idx?.fecha>=0 ? (r[MOV.idx.fecha]||"") : "") || "").trim();
+          map.set(id, { id, total, pagado: 0, pendiente: total, persona, rut, area, creado, abonosCount: 0 });
+        } else if (isAbonoMeta(meta)) {
+          const convId = String(meta.convenioId || "").trim();
+          if (!convId) continue;
+          const monto = Math.abs(Number(meta.monto) || 0) || 0;
+          const cur = abonosByConv.get(convId) || { pagado: 0, count: 0 };
+          cur.pagado += monto;
+          cur.count += 1;
+          abonosByConv.set(convId, cur);
+        }
+      }
+
+      for (const [id, info] of map.entries()) {
+        const ab = abonosByConv.get(id) || { pagado: 0, count: 0 };
+        info.pagado = ab.pagado;
+        info.abonosCount = ab.count;
+        info.pendiente = Math.max(0, (Number(info.total) || 0) - (Number(ab.pagado) || 0));
+        map.set(id, info);
+      }
+      return map;
+    }
+
+    function convenioLabel(c) {
+      const who = c.persona || c.rut || ("ID " + c.id);
+      const pend = formatCLP(c.pendiente);
+      return `${who} · Total ${formatCLP(c.total)} · Pendiente ${pend}`;
+    }
     function setText(id, value) { const el = document.getElementById(id); if (el) el.textContent = value; }
     function monthOfFechaISO(fecha) { const m = (fecha || "").toString().match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? `${m[1]}-${m[2]}` : ""; }
 
@@ -1407,6 +1773,13 @@
       const concepto = document.getElementById("mvConcepto")?.value?.trim() || "";
       const notas = document.getElementById("mvNotas")?.value?.trim() || "";
 
+      // 🤝 Convenio
+      const convenioInternal = document.getElementById("mvConvenioInternal")?.value || "off";
+      const convenioMode = document.querySelector('input[name="convenioMode"]:checked')?.value || "create";
+      const convenioTotal = Number(document.getElementById("mvConvenioTotal")?.value || 0) || 0;
+      const convenioPersona = document.getElementById("mvConvenioPersona")?.value?.trim() || "";
+      const convenioSelectId = document.getElementById("mvConvenioSelect")?.value || "";
+
       const AREA_MAP = {
         "gastos-comunes": "Gastos Comunes",
         "arriendos": "Arriendos",
@@ -1450,6 +1823,14 @@
         concepto,
         notas,
 
+        // 🤝 Convenio
+        convenioInternal,
+        convenioMode,
+        convenioTotal,
+        convenioPersona,
+        convenioSelectId,
+
+
         // ✅ Duplicados “amigables” por si tu Sheet usa headers distintos
         "Local": local,
         "Empleado": empleado,
@@ -1475,10 +1856,80 @@
       };
     }
 
+
+    function applyConvenioToPayload(payload) {
+      // payload.convenioInternal: "on"/"off"
+      if (!payload || payload.convenioInternal !== "on") {
+        // limpiar meta si alguien lo pegó manualmente
+        const { userNotes } = splitNotasMeta(payload?.notas || "");
+        payload.notas = userNotes || "";
+        return payload;
+      }
+
+      const mode = payload.convenioMode || "create";
+      const { userNotes } = splitNotasMeta(payload.notas || "");
+
+      // Helpers: elegir "persona" de los campos ya existentes si no se llena el input
+      const autoPersona =
+        (payload.convenioPersona || "").trim() ||
+        (payload.arrendatarioPropietario || "").trim() ||
+        (payload.proveedorEmpresa || "").trim() ||
+        (payload.empleado || "").trim() ||
+        (payload.local || "").trim() ||
+        (payload.rut || "").trim();
+
+      if (mode === "create") {
+        const total = Number(payload.convenioTotal) || 0;
+        if (total <= 0) throw new Error("Convenio: ingresa el Monto total debido.");
+        // Importante: no impactar ingresos/egresos => monto 0
+        payload.monto = 0;
+        // Para alertas/morosos, dejar como Pendiente por defecto
+        if (!payload.estadoPago) payload.estadoPago = "Pendiente";
+        // Meta
+        const meta = {
+          kind: "convenio",
+          total,
+          persona: autoPersona,
+          rut: payload.rut || "",
+          area: payload.area || "",
+          createdAt: payload.fecha || ""
+        };
+        payload.notas = mergeNotasMeta(userNotes, meta);
+
+        // Si la descripción viene vacía (no debería), poner una sugerencia
+        if (!payload.descripcion) payload.descripcion = `Convenio (${autoPersona || "sin nombre"})`;
+      }
+
+      if (mode === "abono") {
+        const convenioId = String(payload.convenioSelectId || "").trim();
+        if (!convenioId) throw new Error("Abono: selecciona un convenio.");
+        const monto = Number(payload.monto) || 0;
+        if (monto <= 0) throw new Error("Abono: ingresa un monto mayor a 0.");
+
+        // Forzar tipo ingreso por consistencia
+        payload.tipo = "Ingreso";
+        payload.estadoPago = payload.estadoPago || "Pagado";
+
+        const meta = {
+          kind: "abono",
+          convenioId,
+          monto: Math.abs(monto),
+          createdAt: payload.fecha || ""
+        };
+        payload.notas = mergeNotasMeta(userNotes, meta);
+
+        // Sugerencia en descripción si está vacía
+        if (!payload.descripcion) payload.descripcion = `Abono convenio (${convenioId})`;
+      }
+
+      return payload;
+    }
+
     async function saveMovement(event) {
       event.preventDefault();
       try {
-        const payload = readModalFields();
+        let payload = readModalFields();
+        payload = applyConvenioToPayload(payload);
 
         if (EDITING_ID) {
           payload.id = EDITING_ID; // PUT espera id en body
@@ -1587,7 +2038,33 @@
         ["Fecha Vencimiento", formatFechaISO(get(MOV.idx.fechaVencimiento))],
         ["Número Comprobante", get(MOV.idx.numeroComprobante)],
         ["Concepto", get(MOV.idx.concepto)],
-        ["Notas", get(MOV.idx.notas)],
+        ["Notas", (()=>{ const sp = splitNotasMeta(get(MOV.idx.notas)); return sp.userNotes; })()],
+        ...(()=>{
+          const sp = splitNotasMeta(get(MOV.idx.notas));
+          if (!sp.meta) return [];
+          if (sp.meta.kind === "convenio") {
+            const total = Number(sp.meta.total)||0;
+            const idx = buildConvenioIndex();
+            const info = idx.get(String(get(MOV.idx.id)||""));
+            const pend = info ? info.pendiente : Math.max(0,total);
+            return [
+              ["Convenio", "Sí"],
+              ["Total debido", formatCLP(total)],
+              ["Pendiente", formatCLP(pend)],
+              ["Pagado", formatCLP(total - pend)],
+            ];
+          }
+          if (sp.meta.kind === "abono") {
+            const cid = String(sp.meta.convenioId||"");
+            const idx = buildConvenioIndex();
+            const c = idx.get(cid);
+            return [
+              ["Abono a", c ? (c.persona || c.rut || cid) : cid],
+              ["Convenio ID", cid],
+            ];
+          }
+          return [];
+        })(),
       ].filter(([, v]) => String(v || "").trim() !== "");
 
       return `
@@ -1721,6 +2198,26 @@
         const tipo = MOV.idx.tipo >= 0 ? r[MOV.idx.tipo] : "";
         const descripcion = MOV.idx.descripcion >= 0 ? r[MOV.idx.descripcion] : "";
         const monto = MOV.idx.monto >= 0 ? parseMoney(r[MOV.idx.monto]) : 0;
+
+        // 🤝 Convenio: mostrar Total/Pendiente en UI sin afectar estadísticas (monto guardado = 0)
+        const notasRaw = getNotasFromRow(r);
+        const spNotas = splitNotasMeta(notasRaw);
+        const convIdx = buildConvenioIndex();
+        const convInfo = (spNotas.meta && spNotas.meta.kind === "convenio") ? convIdx.get(String(id)) : null;
+
+        const descHtml = (() => {
+          if (!convInfo) return String(descripcion || "");
+          const who = convInfo.persona || convInfo.rut || "";
+          const badge = '<span class="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">Convenio</span>';
+          const sub = `<div class="mt-1 text-xs text-gray-500">Total: <b>${formatCLP(convInfo.total)}</b> · Pendiente: <b class="text-emerald-700">${formatCLP(convInfo.pendiente)}</b></div>`;
+          return `${String(descripcion || "")}${badge}${sub}`;
+        })();
+
+        const montoCellHtml = (() => {
+          if (!convInfo) return `${tipo === "Egreso" ? "-" : ""}${formatCLP(Math.abs(monto)).replace("-", "")}`;
+          // Para convenio, mostrar total (no negativo)
+          return `${formatCLP(convInfo.total).replace("-", "")}`;
+        })();
         const responsable = MOV.idx.responsable >= 0 ? r[MOV.idx.responsable] : "";
 
         const checked = SELECTED_MOV_IDS.has(String(id));
@@ -1740,9 +2237,9 @@
           <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${formatFechaISO(fecha)}</td>
           <td class="px-6 py-4 whitespace-nowrap"><span class="px-3 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">${area || ""}</span></td>
           <td class="px-6 py-4 whitespace-nowrap">${tipoBadge}</td>
-          <td class="px-6 py-4 text-sm text-gray-900">${descripcion || ""}</td>
+          <td class="px-6 py-4 text-sm text-gray-900">${descHtml}</td>
           <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold ${tipo === "Ingreso" ? "text-green-600" : "text-red-600"}">
-            ${tipo === "Egreso" ? "-" : ""}${formatCLP(monto).replace("-", "")}
+            ${montoCellHtml}
           </td>
           <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600"><i class="fas fa-user-circle mr-1"></i>${responsable || ""}</td>
           <td class="px-6 py-4 whitespace-nowrap text-sm">
@@ -1751,13 +2248,27 @@
             ${(() => {
               const _canEdit = canEditRow(r);
               const _canDelete = canDeleteRow(r);
+
+              // 🤝 Botón Abonar (solo si es convenio y tiene pendiente)
+              let abonarBtn = "";
+              try {
+                const sp = splitNotasMeta(getNotasFromRow(r));
+                if (sp.meta && sp.meta.kind === "convenio") {
+                  const idxC = buildConvenioIndex();
+                  const info = idxC.get(String(id));
+                  if (info && (Number(info.pendiente) || 0) > 0) {
+                    abonarBtn = '<button class="text-emerald-600 hover:text-emerald-900 mr-3" data-action="abonar" data-id="'+id+'" title="Abonar convenio"><i class="fas fa-hand-holding-dollar"></i></button>';
+                  }
+                }
+              } catch {}
+
               const editBtn = _canEdit
                 ? '<button class="text-purple-600 hover:text-purple-900 mr-3" data-action="edit" data-id="'+id+'" title="Editar"><i class="fas fa-edit"></i></button>'
                 : '<button class="text-gray-300 mr-3 cursor-not-allowed" disabled title="Sin permiso"><i class="fas fa-edit"></i></button>';
               const delBtn = _canDelete
                 ? '<button class="text-red-600 hover:text-red-900" data-action="delete" data-id="'+id+'" title="Eliminar"><i class="fas fa-trash"></i></button>'
                 : '<button class="text-gray-300 cursor-not-allowed" disabled title="Sin permiso"><i class="fas fa-trash"></i></button>';
-              return editBtn + delBtn;
+              return abonarBtn + editBtn + delBtn;
             })()}
           </td>
         `;
@@ -1807,6 +2318,26 @@
         const tipo = MOV.idx.tipo >= 0 ? (r[MOV.idx.tipo] || "") : "";
         const descripcion = MOV.idx.descripcion >= 0 ? (r[MOV.idx.descripcion] || "") : "";
         const monto = MOV.idx.monto >= 0 ? parseMoney(r[MOV.idx.monto]) : 0;
+
+        // 🤝 Convenio: mostrar Total/Pendiente en UI sin afectar estadísticas (monto guardado = 0)
+        const notasRaw = getNotasFromRow(r);
+        const spNotas = splitNotasMeta(notasRaw);
+        const convIdx = buildConvenioIndex();
+        const convInfo = (spNotas.meta && spNotas.meta.kind === "convenio") ? convIdx.get(String(id)) : null;
+
+        const descHtml = (() => {
+          if (!convInfo) return String(descripcion || "");
+          const who = convInfo.persona || convInfo.rut || "";
+          const badge = '<span class="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">Convenio</span>';
+          const sub = `<div class="mt-1 text-xs text-gray-500">Total: <b>${formatCLP(convInfo.total)}</b> · Pendiente: <b class="text-emerald-700">${formatCLP(convInfo.pendiente)}</b></div>`;
+          return `${String(descripcion || "")}${badge}${sub}`;
+        })();
+
+        const montoCellHtml = (() => {
+          if (!convInfo) return `${tipo === "Egreso" ? "-" : ""}${formatCLP(Math.abs(monto)).replace("-", "")}`;
+          // Para convenio, mostrar total (no negativo)
+          return `${formatCLP(convInfo.total).replace("-", "")}`;
+        })();
         const responsable = MOV.idx.responsable >= 0 ? (r[MOV.idx.responsable] || "") : "";
 
         const tipoBadge =
@@ -1821,7 +2352,7 @@
           <td class="px-6 py-4 whitespace-nowrap">${tipoBadge}</td>
           <td class="px-6 py-4 text-sm text-gray-900">${descripcion}</td>
           <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold ${tipo === "Ingreso" ? "text-green-600" : "text-red-600"}">
-            ${tipo === "Egreso" ? "-" : ""}${formatCLP(monto).replace("-", "")}
+            ${montoCellHtml}
           </td>
           <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600"><i class="fas fa-user-circle mr-1"></i>${responsable}</td>
           <td class="px-6 py-4 whitespace-nowrap text-sm">
@@ -1829,13 +2360,27 @@
             ${(() => {
               const _canEdit = canEditRow(r);
               const _canDelete = canDeleteRow(r);
+
+              // 🤝 Botón Abonar (solo si es convenio y tiene pendiente)
+              let abonarBtn = "";
+              try {
+                const sp = splitNotasMeta(getNotasFromRow(r));
+                if (sp.meta && sp.meta.kind === "convenio") {
+                  const idxC = buildConvenioIndex();
+                  const info = idxC.get(String(id));
+                  if (info && (Number(info.pendiente) || 0) > 0) {
+                    abonarBtn = '<button class="text-emerald-600 hover:text-emerald-900 mr-3" data-action="abonar" data-id="'+id+'" title="Abonar convenio"><i class="fas fa-hand-holding-dollar"></i></button>';
+                  }
+                }
+              } catch {}
+
               const editBtn = _canEdit
                 ? '<button class="text-purple-600 hover:text-purple-900 mr-3" data-action="edit" data-id="'+id+'" title="Editar"><i class="fas fa-edit"></i></button>'
                 : '<button class="text-gray-300 mr-3 cursor-not-allowed" disabled title="Sin permiso"><i class="fas fa-edit"></i></button>';
               const delBtn = _canDelete
                 ? '<button class="text-red-600 hover:text-red-900" data-action="delete" data-id="'+id+'" title="Eliminar"><i class="fas fa-trash"></i></button>'
                 : '<button class="text-gray-300 cursor-not-allowed" disabled title="Sin permiso"><i class="fas fa-trash"></i></button>';
-              return editBtn + delBtn;
+              return abonarBtn + editBtn + delBtn;
             })()}
           </td>
         `;
@@ -2113,7 +2658,32 @@
       setIf("mvFechaVencimiento", getCell(row, MOV.header, ["FechaVencimiento","Fecha Vencimiento","Fecha vencimiento","FechaVencimiento"]));
       setIf("mvNumeroComprobante", getCell(row, MOV.header, ["N°Comprobante","NºComprobante","N° Comprobante","Numero Comprobante","Número comprobante","NumeroComprobante"]));
       setIf("mvConcepto", getCell(row, MOV.header, ["Concepto"]));
-      setIf("mvNotas", getCell(row, MOV.header, ["Notas","Nota"]));
+      (()=>{ const rawN = getCell(row, MOV.header, ["Notas","Nota"]); const sp = splitNotasMeta(rawN); setIf("mvNotas", sp.userNotes); /* meta */
+        clearConvenioUI();
+        if (sp.meta && sp.meta.kind === "convenio") {
+          const ui = getConvenioUI();
+          ui.panel?.classList.remove("hidden");
+          setConvenioInternal(true);
+          const rCreate = document.querySelector('input[name="convenioMode"][value="create"]');
+          if (rCreate) rCreate.checked = true;
+          setConvenioMode("create");
+          const totEl = document.getElementById("mvConvenioTotal");
+          if (totEl) totEl.value = String(Number(sp.meta.total) || 0);
+          const perEl = document.getElementById("mvConvenioPersona");
+          if (perEl) perEl.value = String(sp.meta.persona || "");
+        }
+        if (sp.meta && sp.meta.kind === "abono") {
+          const ui = getConvenioUI();
+          ui.panel?.classList.remove("hidden");
+          setConvenioInternal(true);
+          const rAbono = document.querySelector('input[name="convenioMode"][value="abono"]');
+          if (rAbono) rAbono.checked = true;
+          setConvenioMode("abono");
+          refreshConvenioSelectOptions({ selectedId: String(sp.meta.convenioId || "") });
+        }
+      })();
+
+      clearConvenioUI();
 
       document.getElementById('newMovementModal').classList.remove('hidden');
     }
@@ -2175,6 +2745,7 @@
       showTab("movimientos", firstTabBtn);
 
       document.getElementById("movementForm")?.addEventListener("submit", saveMovement);
+      initConvenioEvents();
       loadMovimientos().catch(console.error);
 
       ["filterArea","filterTipo","filterSearch","filterDesde","filterHasta"].forEach(id => {
@@ -2209,6 +2780,7 @@
         if (action === "print") printTicketById(id);
         if (action === "edit") openEditModalById(id);
         if (action === "delete") deleteMovimientoById(id);
+        if (action === "abonar") openAbonoModalByConvenioId(id);
       });
 
 
