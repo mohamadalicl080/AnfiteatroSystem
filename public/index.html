@@ -229,6 +229,7 @@
           <select id="filterConvenio" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
             <option value="todos">Todos</option>
             <option value="solo">Solo convenios</option>
+            <option value="abono">Abonos</option>
             <option value="pendiente">Convenios pendientes</option>
             <option value="completado">Convenios completados</option>
           </select>
@@ -1770,6 +1771,11 @@
       if (convenio && convenio !== "todos") {
         filtered = filtered.filter(r => {
           const convId = (MOV.idx.convenioId >= 0 ? (r[MOV.idx.convenioId] || "") : "").toString().trim();
+          const convRef = (MOV.idx.convenioRef >= 0 ? (r[MOV.idx.convenioRef] || "") : "").toString().trim();
+
+          // Mostrar solo abonos (movimientos que referencian un convenio)
+          if (convenio === "abono") return !!convRef;
+
           if (!convId) return false;
           const info = getConvenioInfo(convId);
           if (convenio === "solo") return true;
