@@ -3,7 +3,7 @@ const { json, requireApiKey } = require("./_lib/http");
 const { requireAuth, normEmail } = require("./_lib/auth");
 
 const SHEET_NAME = process.env.GOOGLE_SHEETS_MOVIMIENTOS_SHEET || "Movimientos";
-const RANGE = `${SHEET_NAME}!A:Y`; // must cover your columns
+const RANGE = `${SHEET_NAME}!A:AC`; // includes convenio columns // must cover your columns
 
 function withCors(resp) {
   resp.headers = {
@@ -23,7 +23,7 @@ function safeJsonParse(body) {
   }
 }
 
-// Alineado a A:Y (mismo orden que tu Sheet)
+// Alineado a A:AC (incluye columnas de convenio) (mismo orden que tu Sheet)
 function toRow(m) {
   return [
     m.id || "",
@@ -50,11 +50,15 @@ function toRow(m) {
     m.creadoPorEmail || "",
     m.actualizadoEn || "",
     m.actualizadoPorEmail || "",
-    "" // Monto_Asignado (si lo calcula la hoja)
+    "" ,                         // Y: Monto_Asignado (si lo calcula la hoja)
+    m.convenioId || "",          // Z
+    (m.convenioTotal != null ? Number(m.convenioTotal || 0) : ""), // AA
+    m.convenioRef || "",         // AB
+    m.convenioEstado || ""       // AC
   ];
 }
 
-// Convierte una fila A:Y a objeto (para no pisar con "" en PUT)
+// Convierte una fila A:AC a objeto (para no pisar con "" en PUT)
 function rowToObj(r = []) {
   return {
     id: r[0] || "",
@@ -82,6 +86,10 @@ function rowToObj(r = []) {
     actualizadoEn: r[22] || "",
     actualizadoPorEmail: r[23] || "",
     // r[24] es "Monto_Asignado" calculado
+    convenioId: r[25] || "",
+    convenioTotal: r[26] !== undefined && r[26] !== "" ? Number(r[26] || 0) : "",
+    convenioRef: r[27] || "",
+    convenioEstado: r[28] || "",
   };
 }
 
@@ -270,7 +278,7 @@ exports.handler = async (event) => {
 
       // Fila real en la hoja (A1 es header)
       const sheetRowNumber = rowIndexInRows + 2; // +1 header +1 por A1
-      const updateRange = `${SHEET_NAME}!A${sheetRowNumber}:Y${sheetRowNumber}`;
+      const updateRange = `${SHEET_NAME}!A${sheetRowNumber}:AC${sheetRowNumber}`;
       const row = toRow(merged);
 
       await sheets.spreadsheets.values.update({
