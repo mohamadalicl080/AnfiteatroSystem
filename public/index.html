@@ -202,7 +202,7 @@
         </div>
       </div>
 
-      <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6 p-4 bg-gray-50 rounded-lg">
+      <div class="grid grid-cols-1 md:grid-cols-6 gap-4 mb-6 p-4 bg-gray-50 rounded-lg">
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-2">Área</label>
           <select id="filterArea" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
@@ -221,6 +221,16 @@
             <option>Todos</option>
             <option>Ingreso</option>
             <option>Egreso</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">Convenios</label>
+          <select id="filterConvenio" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+            <option value="todos">Todos</option>
+            <option value="solo">Solo convenios</option>
+            <option value="pendiente">Convenios pendientes</option>
+            <option value="completado">Convenios completados</option>
           </select>
         </div>
         
@@ -565,6 +575,26 @@
           </div>
         </div>
 
+        <!-- ✅ Convenios (modo especial) -->
+        <div class="flex items-center justify-between bg-purple-50 border border-purple-200 rounded-lg p-4">
+          <div class="text-sm text-gray-700">
+            <div class="font-semibold"><i class="fas fa-file-signature text-purple-600 mr-2"></i>Convenios</div>
+            <div class="text-xs text-gray-500">Registra un monto total debido y luego aplica abonos hasta completar.</div>
+          </div>
+          <button id="btnToggleConvenio" type="button" class="px-4 py-2 rounded-lg font-semibold border border-purple-300 text-purple-700 hover:bg-purple-100 transition">
+            Activar
+          </button>
+        </div>
+
+        <div id="convenioTotalWrap" class="hidden">
+          <label class="block text-sm font-semibold text-gray-700 mb-2"><i class="fas fa-hand-holding-dollar text-purple-600 mr-2"></i>Monto total del convenio</label>
+          <div class="relative">
+            <span class="absolute left-4 top-3.5 text-gray-500 font-semibold">$</span>
+            <input id="mvConvenioTotal" type="number" placeholder="0" class="w-full pl-8 pr-4 py-3 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition duration-200">
+          </div>
+          <p class="text-xs text-gray-500 mt-1">El convenio se guarda con monto $0 (para no alterar ingresos) y el total queda registrado en la columna Convenio_Total.</p>
+        </div>
+
         <div>
           <label class="block text-sm font-semibold text-gray-700 mb-2"><i class="fas fa-dollar-sign text-purple-600 mr-2"></i>Monto</label>
           <div class="relative">
@@ -716,6 +746,11 @@
     // Paginación (solo pestaña Movimientos)
     const MOV_PAG = { pageSize: 5, page: 1, totalPages: 1, ordered: [] }; // ordered: últimos primero
     let EDITING_ID = null;
+
+    // Convenios
+    let CONVENIO_MODE = false;      // crear convenio
+    let ABONO_TARGET = null;        // convenioId al que se abona
+    const CONV = { byId: new Map(), sumAbonos: new Map() }; // cache derivado
 
     // Tabs
     const TAB_IDS = [
@@ -927,6 +962,7 @@
 
     function openNewMovementModal() {
       EDITING_ID = null;
+      ABONO_TARGET = null;
       document.getElementById('modalTitle').textContent = 'Nuevo Movimiento';
       document.getElementById('modalSubmitText').textContent = 'Guardar Movimiento';
       document.getElementById('movementForm')?.reset();
@@ -953,6 +989,68 @@
         const el = document.getElementById(id);
         if (el) el.value = "";
       });
+
+      // Convenios: vuelve a modo normal
+      setConvenioMode(false);
+
+      // habilitar monto por si quedó bloqueado
+      const montoEl = document.getElementById("mvMonto");
+      if (montoEl) { montoEl.disabled = false; montoEl.classList.remove("opacity-60"); }
+
+      document.getElementById('newMovementModal').classList.remove('hidden');
+    }
+
+    function openAbonoModalByConvenioId(convId) {
+      const info = getConvenioInfo(String(convId || "").trim());
+      if (!info) return alert("No encontré el convenio para abonar.");
+
+      EDITING_ID = null;
+      ABONO_TARGET = info.convId;
+      setConvenioMode(false);
+
+      document.getElementById('modalTitle').textContent = 'Nuevo Abono (Convenio)';
+      document.getElementById('modalSubmitText').textContent = 'Guardar Abono';
+      document.getElementById('movementForm')?.reset();
+
+      // Defaults: copia del convenio
+      const idx = MOV.idx;
+      const row = info.row;
+
+      const fechaEl = document.getElementById('mvFecha');
+      if (fechaEl) fechaEl.value = new Date().toISOString().slice(0,10);
+
+      const areaEl = document.getElementById('mvArea');
+      const areaVal = idx.area >= 0 ? (row[idx.area] || "") : "Otros";
+      const AREA_REV = {
+        "Gastos Comunes": "gastos-comunes",
+        "Arriendos": "arriendos",
+        "Proveedores": "proveedores",
+        "Empleados": "empleados",
+        "Caja Chica": "caja-chica",
+        "Otros": "otros"
+      };
+      if (areaEl) areaEl.value = AREA_REV[areaVal] || "otros";
+
+      // Forzar tipo Ingreso
+      const ingreso = document.getElementById('mvTipoIngreso');
+      const egreso = document.getElementById('mvTipoEgreso');
+      if (ingreso) ingreso.checked = true;
+      if (egreso) egreso.checked = false;
+
+      const descEl = document.getElementById('mvDescripcion');
+      const baseDesc = idx.descripcion >= 0 ? (row[idx.descripcion] || "") : "Convenio";
+      if (descEl) descEl.value = `Abono convenio: ${baseDesc}`;
+
+      const periodoEl = document.getElementById('mvPeriodo');
+      if (periodoEl) periodoEl.value = (idx.periodo >= 0 ? (row[idx.periodo] || new Date().toISOString().slice(0,7)) : new Date().toISOString().slice(0,7));
+
+      // EstadoPago normalmente vacío en abonos
+      const ep = document.getElementById('mvEstadoPago');
+      if (ep) ep.value = "";
+
+      // Habilitar monto
+      const montoEl = document.getElementById('mvMonto');
+      if (montoEl) { montoEl.disabled = false; montoEl.classList.remove('opacity-60'); montoEl.value = ""; }
 
       document.getElementById('newMovementModal').classList.remove('hidden');
     }
@@ -1277,7 +1375,94 @@
         concepto: findCol(header, ["Concepto"]),
         notas: findCol(header, ["Notas","Nota"]),
         creadoPorEmail: findCol(header, ["CreadoPorEmail","Creado Por Email","CreadoPorEmail","CreadoPor","Creado Por","CreadoPorMail","Creado Por Mail"]),
+
+        // Convenios (columnas nuevas)
+        convenioId: findCol(header, ["Convenio_ID","Convenio ID","ConvenioId","CONVENIO_ID","convenio_id"]),
+        convenioTotal: findCol(header, ["Convenio_Total","Convenio Total","ConvenioTotal","CONVENIO_TOTAL","convenio_total"]),
+        convenioRef: findCol(header, ["Convenio_Ref","Convenio Ref","ConvenioRef","CONVENIO_REF","convenio_ref"]),
+        convenioEstado: findCol(header, ["Convenio_Estado","Convenio Estado","ConvenioEstado","CONVENIO_ESTADO","convenio_estado"]),
       };
+    }
+
+    // -----------------------------
+    // Convenios (helpers)
+    // -----------------------------
+    function genMovId(fechaISO) {
+      const d = String(fechaISO || "").replaceAll("-", "") || "00000000";
+      return `MOV-${d}-${String(Math.floor(Math.random() * 9999)).padStart(4, "0")}`;
+    }
+
+    function isConvenioRow(r) {
+      return !!(MOV.idx?.convenioId >= 0 && (r[MOV.idx.convenioId] || "").toString().trim());
+    }
+    function isAbonoRow(r) {
+      return !!(MOV.idx?.convenioRef >= 0 && (r[MOV.idx.convenioRef] || "").toString().trim());
+    }
+
+    function computeConveniosCache() {
+      CONV.byId = new Map();
+      CONV.sumAbonos = new Map();
+      const iId = MOV.idx?.id ?? -1;
+      const iConvId = MOV.idx?.convenioId ?? -1;
+      const iConvTotal = MOV.idx?.convenioTotal ?? -1;
+      const iConvRef = MOV.idx?.convenioRef ?? -1;
+      const iMonto = MOV.idx?.monto ?? -1;
+      const iEstadoPago = MOV.idx?.estadoPago ?? -1;
+
+      if (iId < 0 || iConvId < 0) return;
+
+      for (const r of (MOV.rows || [])) {
+        const convId = (iConvId >= 0 ? (r[iConvId] || "") : "").toString().trim();
+        const convRef = (iConvRef >= 0 ? (r[iConvRef] || "") : "").toString().trim();
+        const estadoPago = iEstadoPago >= 0 ? (r[iEstadoPago] || "") : "";
+        if (isAnuladoEstado(estadoPago)) continue;
+
+        if (convId) {
+          const total = iConvTotal >= 0 ? Math.abs(parseMoney(r[iConvTotal])) : 0;
+          const rowId = iId >= 0 ? (r[iId] || "") : "";
+          CONV.byId.set(convId, { convId, rowId: String(rowId), total, row: r });
+        }
+        if (convRef) {
+          const monto = iMonto >= 0 ? Math.abs(parseMoney(r[iMonto])) : 0;
+          CONV.sumAbonos.set(convRef, (CONV.sumAbonos.get(convRef) || 0) + monto);
+        }
+      }
+    }
+
+    function getConvenioInfo(convId) {
+      if (!convId) return null;
+      const base = CONV.byId.get(String(convId)) || null;
+      if (!base) return null;
+      const abonado = CONV.sumAbonos.get(String(convId)) || 0;
+      const saldo = Math.max(0, (Number(base.total) || 0) - abonado);
+      const estado = saldo <= 0 ? "Completado" : "Pendiente";
+      return { ...base, abonado, saldo, estado };
+    }
+
+    function setConvenioMode(on) {
+      CONVENIO_MODE = !!on;
+      if (CONVENIO_MODE) ABONO_TARGET = null;
+
+      const wrap = document.getElementById("convenioTotalWrap");
+      const btn = document.getElementById("btnToggleConvenio");
+      const totalEl = document.getElementById("mvConvenioTotal");
+      const montoEl = document.getElementById("mvMonto");
+
+      const ingreso = document.getElementById("mvTipoIngreso");
+      const egreso = document.getElementById("mvTipoEgreso");
+
+      if (wrap) wrap.classList.toggle("hidden", !CONVENIO_MODE);
+      if (btn) btn.textContent = CONVENIO_MODE ? "Desactivar" : "Activar";
+
+      // En convenio: forzamos Ingreso + monto $0
+      if (ingreso) ingreso.checked = true;
+      if (egreso) egreso.checked = false;
+      if (montoEl) {
+        montoEl.value = CONVENIO_MODE ? 0 : (montoEl.value || "");
+        montoEl.disabled = CONVENIO_MODE; // el monto real está en mvConvenioTotal
+        montoEl.classList.toggle("opacity-60", CONVENIO_MODE);
+      }
+      if (!CONVENIO_MODE && totalEl) totalEl.value = "";
     }
 
     function calcStatsFromMovs(header, rows) {
@@ -1390,10 +1575,11 @@
       const tipoRaw = document.querySelector('#movementForm input[name="tipo"]:checked')?.value?.trim() || "";
       const descripcion = document.getElementById("mvDescripcion")?.value?.trim() || "";
       const monto = Number(document.getElementById("mvMonto")?.value || 0) || 0;
+      const convenioTotal = Number(document.getElementById("mvConvenioTotal")?.value || 0) || 0;
       const periodo = document.getElementById("mvPeriodo")?.value?.trim() || "";
 
       // ✅ Estado de Pago
-      const estadoPago = document.getElementById("mvEstadoPago")?.value?.trim() || "";
+      let estadoPago = document.getElementById("mvEstadoPago")?.value?.trim() || "";
 
       // ✅ Detalles adicionales (restaurados)
       const local = document.getElementById("mvLocal")?.value?.trim() || "";
@@ -1416,13 +1602,48 @@
         "otros": "Otros"
       };
       const area = AREA_MAP[areaRaw] || areaRaw;
-      const tipo = (tipoRaw === "ingreso" ? "Ingreso" : tipoRaw === "egreso" ? "Egreso" : tipoRaw);
+      // Forzamos tipo ingreso en convenio/abono
+      const forcedTipoRaw = (CONVENIO_MODE || ABONO_TARGET) ? "ingreso" : tipoRaw;
+      const tipo = (forcedTipoRaw === "ingreso" ? "Ingreso" : forcedTipoRaw === "egreso" ? "Egreso" : forcedTipoRaw);
 
       if (!fecha || !area || !tipo || !descripcion) {
         throw new Error(`Faltan campos requeridos (fecha, area, tipo, descripcion).`);
       }
 
+      // Convenios / Abonos
+      let convenioId = "";
+      let convenioRef = "";
+      let convenioEstado = "";
+      let convenioTotalOut = "";
+
+      // Crear convenio (nuevo)
+      if (CONVENIO_MODE && !EDITING_ID) {
+        if (!(convenioTotal > 0)) throw new Error("Debes ingresar el monto total del convenio.");
+        const newId = genMovId(fecha);
+        convenioId = newId;
+        convenioTotalOut = convenioTotal;
+        convenioEstado = "Pendiente";
+        if (!estadoPago) estadoPago = "Pendiente";
+      }
+
+      // Editar convenio existente: permite ajustar total/estado
+      if (CONVENIO_MODE && EDITING_ID) {
+        if (!(convenioTotal > 0)) throw new Error("Debes ingresar el monto total del convenio.");
+        convenioId = EDITING_ID;
+        convenioTotalOut = convenioTotal;
+        convenioEstado = "Pendiente";
+        if (!estadoPago) estadoPago = "Pendiente";
+      }
+
+      // Abono a convenio
+      if (ABONO_TARGET) {
+        if (!(monto > 0)) throw new Error("Debes ingresar el monto del abono.");
+        convenioRef = String(ABONO_TARGET);
+      }
+
       return {
+        // Si es convenio nuevo: fijamos id para que el convenioId sea estable
+        ...(CONVENIO_MODE && !EDITING_ID ? { id: convenioId } : {}),
         fecha, area, tipo, descripcion, monto,
         responsable: currentUser?.name || "Admin",
         periodo,
@@ -1472,6 +1693,13 @@
         "Número comprobante": numeroComprobante,
         "Concepto": concepto,
         "Notas": notas
+
+        ,
+        // ===== Convenios =====
+        convenioId,
+        convenioTotal: convenioTotalOut,
+        convenioRef,
+        convenioEstado
       };
     }
 
@@ -1499,6 +1727,31 @@
 
         closeModal();
         await loadMovimientos();
+
+        // Si fue un abono, y se completó el convenio, marcamos el convenio como pagado/completado
+        if (ABONO_TARGET) {
+          const target = String(ABONO_TARGET);
+          const info = getConvenioInfo(target);
+          if (info && info.saldo <= 0) {
+            try {
+              await apiFetch(`/.netlify/functions/movimientos`, {
+                method: "PUT",
+                body: JSON.stringify({
+                  id: info.rowId,
+                  convenioEstado: "Completado",
+                  estadoPago: "Pagado"
+                })
+              });
+              await loadMovimientos();
+            } catch (e) {
+              console.warn("No pude marcar convenio como completado:", e);
+            }
+          }
+        }
+
+        // reset flags
+        ABONO_TARGET = null;
+        setConvenioMode(false);
       } catch (err) {
         alert("❌ Error guardando: " + err.message);
         console.error(err);
@@ -1517,6 +1770,7 @@
       return {
         area: document.getElementById("filterArea")?.value || "Todas las áreas",
         tipo: document.getElementById("filterTipo")?.value || "Todos",
+        convenio: document.getElementById("filterConvenio")?.value || "todos",
         search: document.getElementById("filterSearch")?.value || "",
         desde: document.getElementById("filterDesde")?.value || "",
         hasta: document.getElementById("filterHasta")?.value || ""
@@ -1527,11 +1781,24 @@
       const tbody = document.getElementById("movimientosBody");
       if (!tbody || !MOV.idx) return;
 
-      const { area, tipo, desde, hasta, search } = getFilters();
+      const { area, tipo, convenio, desde, hasta, search } = getFilters();
       let filtered = MOV.rows.slice();
 
       if (area !== "Todas las áreas") filtered = filtered.filter(r => (r[MOV.idx.area] || "") === area);
       if (tipo !== "Todos") filtered = filtered.filter(r => (r[MOV.idx.tipo] || "") === tipo);
+
+      // Convenios
+      if (convenio && convenio !== "todos") {
+        filtered = filtered.filter(r => {
+          const convId = (MOV.idx.convenioId >= 0 ? (r[MOV.idx.convenioId] || "") : "").toString().trim();
+          if (!convId) return false;
+          const info = getConvenioInfo(convId);
+          if (convenio === "solo") return true;
+          if (convenio === "pendiente") return (info ? info.saldo > 0 : true);
+          if (convenio === "completado") return (info ? info.saldo <= 0 : false);
+          return true;
+        });
+      }
       if (desde) filtered = filtered.filter(r => (r[MOV.idx.fecha] || "") >= desde);
       if (hasta) filtered = filtered.filter(r => (r[MOV.idx.fecha] || "") <= hasta);
 
@@ -1723,13 +1990,37 @@
         const monto = MOV.idx.monto >= 0 ? parseMoney(r[MOV.idx.monto]) : 0;
         const responsable = MOV.idx.responsable >= 0 ? r[MOV.idx.responsable] : "";
 
+        const convId = MOV.idx.convenioId >= 0 ? (r[MOV.idx.convenioId] || "") : "";
+        const convInfo = convId ? getConvenioInfo(String(convId).trim()) : null;
+
         const checked = SELECTED_MOV_IDS.has(String(id));
         MOV_PAG.pageIds.push(String(id));
 
-        const tipoBadge =
-          tipo === "Ingreso"
+        const tipoBadge = (() => {
+          if (convInfo) {
+            const stCls = convInfo.saldo <= 0 ? "bg-emerald-100 text-emerald-800" : "bg-purple-100 text-purple-800";
+            const stIcon = convInfo.saldo <= 0 ? "fa-circle-check" : "fa-file-signature";
+            return `<span class="px-3 py-1 text-xs font-semibold rounded-full ${stCls}"><i class="fas ${stIcon} mr-1"></i>Convenio</span>`;
+          }
+          if (isAbonoRow(r)) {
+            return `<span class="px-3 py-1 text-xs font-semibold rounded-full bg-sky-100 text-sky-800"><i class="fas fa-coins mr-1"></i>Abono</span>`;
+          }
+          return (tipo === "Ingreso")
             ? `<span class="px-3 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800"><i class="fas fa-arrow-up mr-1"></i>Ingreso</span>`
             : `<span class="px-3 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800"><i class="fas fa-arrow-down mr-1"></i>Egreso</span>`;
+        })();
+
+        const montoCellHtml = (() => {
+          if (convInfo) {
+            return `
+              <div class="text-sm font-semibold text-gray-900">Total: ${formatCLP(convInfo.total)}</div>
+              <div class="text-xs ${convInfo.saldo <= 0 ? "text-emerald-700" : "text-purple-700"}">Pendiente: ${formatCLP(convInfo.saldo)}</div>
+            `;
+          }
+          const abs = Math.abs(Number(monto) || 0);
+          const cls = tipo === "Ingreso" ? "text-green-600" : "text-red-600";
+          return `<span class="text-sm font-semibold ${cls}">${tipo === "Egreso" ? "-" : ""}${formatCLP(abs).replace("-", "")}</span>`;
+        })();
 
         const tr = document.createElement("tr");
         tr.className = "hover:bg-gray-50 transition duration-150";
@@ -1741,13 +2032,12 @@
           <td class="px-6 py-4 whitespace-nowrap"><span class="px-3 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">${area || ""}</span></td>
           <td class="px-6 py-4 whitespace-nowrap">${tipoBadge}</td>
           <td class="px-6 py-4 text-sm text-gray-900">${descripcion || ""}</td>
-          <td class="px-6 py-4 whitespace-nowrap text-sm font-semibold ${tipo === "Ingreso" ? "text-green-600" : "text-red-600"}">
-            ${tipo === "Egreso" ? "-" : ""}${formatCLP(monto).replace("-", "")}
-          </td>
+          <td class="px-6 py-4 whitespace-nowrap">${montoCellHtml}</td>
           <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600"><i class="fas fa-user-circle mr-1"></i>${responsable || ""}</td>
           <td class="px-6 py-4 whitespace-nowrap text-sm">
             <button class="text-blue-600 hover:text-blue-900 mr-3" data-action="view" data-id="${id}" title="Ver ticket"><i class="fas fa-receipt"></i></button>
             <button class="text-indigo-600 hover:text-indigo-900 mr-3" data-action="print" data-id="${id}" title="Imprimir ticket"><i class="fas fa-print"></i></button>
+            ${convInfo && convInfo.saldo > 0 ? `<button class="text-emerald-600 hover:text-emerald-900 mr-3" data-action="abonar" data-conv="${convInfo.convId}" title="Registrar abono"><i class="fas fa-coins"></i></button>` : ``}
             ${(() => {
               const _canEdit = canEditRow(r);
               const _canDelete = canDeleteRow(r);
@@ -1898,6 +2188,12 @@
       // Pendientes / atrasados / morosos
       if (iEstado >= 0) {
         for (const r of (MOV.rows || [])) {
+          // ✅ Convenios completados: no entran a alertas
+          if (isConvenioRow(r)) {
+            const convId = (MOV.idx?.convenioId >= 0 ? (r[MOV.idx.convenioId] || "") : "").toString().trim();
+            const info = convId ? getConvenioInfo(convId) : null;
+            if (info && info.saldo <= 0) continue;
+          }
           const estado = (r[iEstado] || "").toString();
           if (isAnuladoEstado(estado)) continue;
           const e = norm(estado);
@@ -2061,6 +2357,7 @@
       if (!row) return alert("No encontré el movimiento en cache: " + id);
 
       EDITING_ID = id;
+      ABONO_TARGET = null;
       document.getElementById('modalTitle').textContent = 'Editar Movimiento';
       document.getElementById('modalSubmitText').textContent = 'Guardar Cambios';
 
@@ -2091,6 +2388,20 @@
       document.getElementById("mvDescripcion").value = descripcion;
       document.getElementById("mvMonto").value = Math.abs(monto);
       if (periodo) document.getElementById("mvPeriodo").value = periodo;
+
+      // Convenio: si la fila tiene Convenio_ID, activar modo convenio y cargar total
+      const convId = (idx.convenioId >= 0 ? (row[idx.convenioId] || "") : "").toString().trim();
+      if (convId) {
+        setConvenioMode(true);
+        const tot = (idx.convenioTotal >= 0 ? parseMoney(row[idx.convenioTotal]) : 0);
+        const tEl = document.getElementById("mvConvenioTotal");
+        if (tEl) tEl.value = Math.abs(Number(tot) || 0);
+        // monto del movimiento convenio siempre $0
+        const mEl = document.getElementById("mvMonto");
+        if (mEl) mEl.value = 0;
+      } else {
+        setConvenioMode(false);
+      }
 
       // ✅ cargar estado pago si viene en el sheet
       const ep = document.getElementById("mvEstadoPago");
@@ -2137,6 +2448,9 @@
       MOV.rows = data.rows || [];
       MOV.idx = buildIdx(MOV.header);
 
+      // Convenios: recalcular cache derivado
+      computeConveniosCache();
+
       updateCards(MOV.header, MOV.rows);
       applyFiltersAndRender();
       renderAreaTabs();
@@ -2175,9 +2489,14 @@
       showTab("movimientos", firstTabBtn);
 
       document.getElementById("movementForm")?.addEventListener("submit", saveMovement);
+
+      // Convenios: toggle modo
+      document.getElementById("btnToggleConvenio")?.addEventListener("click", () => {
+        setConvenioMode(!CONVENIO_MODE);
+      });
       loadMovimientos().catch(console.error);
 
-      ["filterArea","filterTipo","filterSearch","filterDesde","filterHasta"].forEach(id => {
+      ["filterArea","filterTipo","filterConvenio","filterSearch","filterDesde","filterHasta"].forEach(id => {
         const el = document.getElementById(id);
         if (!el) return;
         if (id === "filterSearch") {
@@ -2209,6 +2528,7 @@
         if (action === "print") printTicketById(id);
         if (action === "edit") openEditModalById(id);
         if (action === "delete") deleteMovimientoById(id);
+        if (action === "abonar") openAbonoModalByConvenioId(btn.dataset.conv);
       });
 
 

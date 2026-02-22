@@ -3,7 +3,9 @@ const { json, requireApiKey } = require("./_lib/http");
 const { requireAuth, normEmail } = require("./_lib/auth");
 
 const SHEET_NAME = process.env.GOOGLE_SHEETS_MOVIMIENTOS_SHEET || "Movimientos";
-const RANGE = `${SHEET_NAME}!A:Y`; // must cover your columns
+// A:... debe cubrir TODAS tus columnas. Tu sheet actual llega a Y (Monto_Signado)
+// y para Convenios agregaremos 4 columnas al final: Z..AC.
+const RANGE = `${SHEET_NAME}!A:AC`; // must cover your columns
 
 function withCors(resp) {
   resp.headers = {
@@ -23,7 +25,7 @@ function safeJsonParse(body) {
   }
 }
 
-// Alineado a A:Y (mismo orden que tu Sheet)
+// Alineado a A:AC (mismo orden que tu Sheet)
 function toRow(m) {
   return [
     m.id || "",
@@ -50,11 +52,17 @@ function toRow(m) {
     m.creadoPorEmail || "",
     m.actualizadoEn || "",
     m.actualizadoPorEmail || "",
-    "" // Monto_Asignado (si lo calcula la hoja)
+    "", // Monto_Asignado (si lo calcula la hoja)
+
+    // ====== Convenios (Columnas nuevas) ======
+    m.convenioId || "", // Z  Convenio_ID
+    (m.convenioTotal != null ? Number(m.convenioTotal || 0) : ""), // AA Convenio_Total
+    m.convenioRef || "", // AB Convenio_Ref (abonos)
+    m.convenioEstado || "" // AC Convenio_Estado
   ];
 }
 
-// Convierte una fila A:Y a objeto (para no pisar con "" en PUT)
+// Convierte una fila A:AC a objeto (para no pisar con "" en PUT)
 function rowToObj(r = []) {
   return {
     id: r[0] || "",
@@ -82,6 +90,12 @@ function rowToObj(r = []) {
     actualizadoEn: r[22] || "",
     actualizadoPorEmail: r[23] || "",
     // r[24] es "Monto_Asignado" calculado
+
+    // Convenios
+    convenioId: r[25] || "",
+    convenioTotal: (r[26] === "" || r[26] == null) ? "" : Number(r[26] || 0),
+    convenioRef: r[27] || "",
+    convenioEstado: r[28] || "",
   };
 }
 
@@ -270,7 +284,7 @@ exports.handler = async (event) => {
 
       // Fila real en la hoja (A1 es header)
       const sheetRowNumber = rowIndexInRows + 2; // +1 header +1 por A1
-      const updateRange = `${SHEET_NAME}!A${sheetRowNumber}:Y${sheetRowNumber}`;
+      const updateRange = `${SHEET_NAME}!A${sheetRowNumber}:AC${sheetRowNumber}`;
       const row = toRow(merged);
 
       await sheets.spreadsheets.values.update({
