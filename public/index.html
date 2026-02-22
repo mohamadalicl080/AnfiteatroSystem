@@ -300,6 +300,12 @@
           <tbody id="gastosBody" class="bg-white divide-y divide-gray-200"></tbody>
         </table>
       </div>
+
+      <!-- Paginación (5 por página) -->
+      <div class="flex justify-between items-center mt-6">
+        <p id="gastosInfo" class="text-sm text-gray-600">Mostrando 0-0 de 0 movimientos</p>
+        <div id="gastosPagination" class="flex space-x-2"></div>
+      </div>
     </div>
 
     <!-- Arriendos -->
@@ -321,6 +327,12 @@
           </thead>
           <tbody id="arriendosBody" class="bg-white divide-y divide-gray-200"></tbody>
         </table>
+      </div>
+
+      <!-- Paginación (5 por página) -->
+      <div class="flex justify-between items-center mt-6">
+        <p id="arriendosInfo" class="text-sm text-gray-600">Mostrando 0-0 de 0 movimientos</p>
+        <div id="arriendosPagination" class="flex space-x-2"></div>
       </div>
     </div>
 
@@ -344,6 +356,12 @@
           <tbody id="proveedoresBody" class="bg-white divide-y divide-gray-200"></tbody>
         </table>
       </div>
+
+      <!-- Paginación (5 por página) -->
+      <div class="flex justify-between items-center mt-6">
+        <p id="proveedoresInfo" class="text-sm text-gray-600">Mostrando 0-0 de 0 movimientos</p>
+        <div id="proveedoresPagination" class="flex space-x-2"></div>
+      </div>
     </div>
 
     <!-- Empleados -->
@@ -365,6 +383,12 @@
           </thead>
           <tbody id="empleadosBody" class="bg-white divide-y divide-gray-200"></tbody>
         </table>
+      </div>
+
+      <!-- Paginación (5 por página) -->
+      <div class="flex justify-between items-center mt-6">
+        <p id="empleadosInfo" class="text-sm text-gray-600">Mostrando 0-0 de 0 movimientos</p>
+        <div id="empleadosPagination" class="flex space-x-2"></div>
       </div>
     </div>
 
@@ -388,6 +412,12 @@
           <tbody id="cajaChicaBody" class="bg-white divide-y divide-gray-200"></tbody>
         </table>
       </div>
+
+      <!-- Paginación (5 por página) -->
+      <div class="flex justify-between items-center mt-6">
+        <p id="cajaChicaInfo" class="text-sm text-gray-600">Mostrando 0-0 de 0 movimientos</p>
+        <div id="cajaChicaPagination" class="flex space-x-2"></div>
+      </div>
     </div>
 
     <!-- Otros -->
@@ -409,6 +439,12 @@
           </thead>
           <tbody id="otrosBody" class="bg-white divide-y divide-gray-200"></tbody>
         </table>
+      </div>
+
+      <!-- Paginación (5 por página) -->
+      <div class="flex justify-between items-center mt-6">
+        <p id="otrosInfo" class="text-sm text-gray-600">Mostrando 0-0 de 0 movimientos</p>
+        <div id="otrosPagination" class="flex space-x-2"></div>
       </div>
     </div>
 
@@ -1242,6 +1278,73 @@
     // -----------------------------
     function clamp(n, min, max) { return Math.min(max, Math.max(min, n)); }
 
+    // -----------------------------
+    // Paginación pestañas por área (Gastos/Arriendos/etc.)
+    // -----------------------------
+    const AREA_PAG = {
+      gastos: { pageSize: 5, page: 1, totalPages: 1 },
+      arriendos: { pageSize: 5, page: 1, totalPages: 1 },
+      proveedores: { pageSize: 5, page: 1, totalPages: 1 },
+      empleados: { pageSize: 5, page: 1, totalPages: 1 },
+      cajaChica: { pageSize: 5, page: 1, totalPages: 1 },
+      otros: { pageSize: 5, page: 1, totalPages: 1 },
+    };
+
+    function renderPaginationInto(paginationId, { page, totalPages }, setPageFn) {
+      const pagEl = document.getElementById(paginationId);
+      if (!pagEl) return;
+      pagEl.innerHTML = "";
+
+      const cur = page;
+      const tp = totalPages || 1;
+
+      function makeBtn(label, onClick, { active = false, disabled = false } = {}) {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.textContent = label;
+        b.className = active
+          ? "px-4 py-2 bg-purple-600 text-white rounded-lg"
+          : "px-4 py-2 border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50";
+        if (disabled) {
+          b.disabled = true;
+          b.classList.remove("hover:bg-gray-50");
+          b.classList.add("opacity-50", "cursor-not-allowed");
+        } else {
+          b.addEventListener("click", onClick);
+        }
+        return b;
+      }
+
+      function addEllipsis() {
+        const s = document.createElement("span");
+        s.className = "px-2 py-2 text-gray-500 select-none";
+        s.textContent = "…";
+        pagEl.appendChild(s);
+      }
+
+      pagEl.appendChild(makeBtn("Anterior", () => setPageFn(cur - 1), { disabled: cur <= 1 }));
+
+      const pages = [];
+      if (tp <= 7) {
+        for (let p = 1; p <= tp; p++) pages.push(p);
+      } else {
+        pages.push(1);
+        const left = Math.max(2, cur - 1);
+        const right = Math.min(tp - 1, cur + 1);
+        if (left > 2) pages.push("…");
+        for (let p = left; p <= right; p++) pages.push(p);
+        if (right < tp - 1) pages.push("…");
+        pages.push(tp);
+      }
+
+      pages.forEach(p => {
+        if (p === "…") return addEllipsis();
+        pagEl.appendChild(makeBtn(String(p), () => setPageFn(p), { active: p === cur }));
+      });
+
+      pagEl.appendChild(makeBtn("Siguiente", () => setPageFn(cur + 1), { disabled: cur >= tp }));
+    }
+
     function setMovFilteredRows(filteredRows, { resetPage = true } = {}) {
       // Orden: últimos primero (para mantener el comportamiento actual)
       MOV_PAG.ordered = (filteredRows || []).slice().reverse();
@@ -2070,13 +2173,12 @@
       return { count, total };
     }
 
-    function renderMovRowsInto(tbodyId, rows) {
+    function renderMovRowsInto(tbodyId, orderedRows) {
       const tbody = document.getElementById(tbodyId);
       if (!tbody) return;
       tbody.innerHTML = "";
 
-      const lastRows = (rows || []).slice().reverse().slice(0, 20);
-      lastRows.forEach(r => {
+      (orderedRows || []).forEach(r => {
         const id = MOV.idx.id >= 0 ? (r[MOV.idx.id] || "") : "";
         const fecha = MOV.idx.fecha >= 0 ? (r[MOV.idx.fecha] || "") : "";
         const tipo = MOV.idx.tipo >= 0 ? (r[MOV.idx.tipo] || "") : "";
@@ -2118,42 +2220,108 @@
       });
     }
 
+    function renderAreaWithPagination({ key, tbodyId, infoId, paginationId, rows }) {
+      const st = AREA_PAG[key];
+      if (!st) return;
+
+      // Orden: últimos primero
+      const ordered = (rows || []).slice().reverse();
+      const total = ordered.length;
+      st.totalPages = Math.max(1, Math.ceil(total / st.pageSize));
+      st.page = clamp(st.page, 1, st.totalPages);
+
+      const startIdx = (st.page - 1) * st.pageSize;
+      const endIdx = Math.min(startIdx + st.pageSize, total);
+      const pageRows = ordered.slice(startIdx, endIdx);
+
+      // Info
+      const infoEl = document.getElementById(infoId);
+      const a = total === 0 ? 0 : (startIdx + 1);
+      const b = total === 0 ? 0 : endIdx;
+      if (infoEl) infoEl.textContent = `Mostrando ${a}-${b} de ${total} movimientos`;
+
+      // Tabla
+      renderMovRowsInto(tbodyId, pageRows);
+
+      // Paginación
+      renderPaginationInto(paginationId, { page: st.page, totalPages: st.totalPages }, (p) => {
+        st.page = clamp(p, 1, st.totalPages);
+        renderAreaTabs();
+      });
+    }
+
     function renderAreaTabs() {
       const gastos = filterRowsByArea("Gastos Comunes");
       const g = calcCountAndTotal(gastos);
       setText("gastosCount", String(g.count));
       setText("gastosTotal", formatCLP(g.total));
-      renderMovRowsInto("gastosBody", gastos);
+      renderAreaWithPagination({
+        key: "gastos",
+        tbodyId: "gastosBody",
+        infoId: "gastosInfo",
+        paginationId: "gastosPagination",
+        rows: gastos
+      });
 
       const ar = filterRowsByArea("Arriendos");
       const a = calcCountAndTotal(ar);
       setText("arriendosCount", String(a.count));
       setText("arriendosTotal", formatCLP(a.total));
-      renderMovRowsInto("arriendosBody", ar);
+      renderAreaWithPagination({
+        key: "arriendos",
+        tbodyId: "arriendosBody",
+        infoId: "arriendosInfo",
+        paginationId: "arriendosPagination",
+        rows: ar
+      });
 
       const pr = filterRowsByArea("Proveedores");
       const p = calcCountAndTotal(pr);
       setText("proveedoresCount", String(p.count));
       setText("proveedoresTotal", formatCLP(p.total));
-      renderMovRowsInto("proveedoresBody", pr);
+      renderAreaWithPagination({
+        key: "proveedores",
+        tbodyId: "proveedoresBody",
+        infoId: "proveedoresInfo",
+        paginationId: "proveedoresPagination",
+        rows: pr
+      });
 
       const em = filterRowsByArea("Empleados");
       const e = calcCountAndTotal(em);
       setText("empleadosCount", String(e.count));
       setText("empleadosTotal", formatCLP(e.total));
-      renderMovRowsInto("empleadosBody", em);
+      renderAreaWithPagination({
+        key: "empleados",
+        tbodyId: "empleadosBody",
+        infoId: "empleadosInfo",
+        paginationId: "empleadosPagination",
+        rows: em
+      });
 
       const cc = filterRowsByArea("Caja Chica");
       const c = calcCountAndTotal(cc);
       setText("cajaChicaCount", String(c.count));
       setText("cajaChicaTotal", formatCLP(c.total));
-      renderMovRowsInto("cajaChicaBody", cc);
+      renderAreaWithPagination({
+        key: "cajaChica",
+        tbodyId: "cajaChicaBody",
+        infoId: "cajaChicaInfo",
+        paginationId: "cajaChicaPagination",
+        rows: cc
+      });
 
       const ot = filterRowsByArea("Otros");
       const o = calcCountAndTotal(ot);
       setText("otrosCount", String(o.count));
       setText("otrosTotal", formatCLP(o.total));
-      renderMovRowsInto("otrosBody", ot);
+      renderAreaWithPagination({
+        key: "otros",
+        tbodyId: "otrosBody",
+        infoId: "otrosInfo",
+        paginationId: "otrosPagination",
+        rows: ot
+      });
     }
 
     function renderAlertas() {
@@ -2633,4 +2801,6 @@ function renderResumenMensual() {
 
 </body>
 </html>
+
+
 
