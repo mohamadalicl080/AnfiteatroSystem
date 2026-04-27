@@ -7,11 +7,14 @@ Netlify publica automáticamente:
 - `/.netlify/functions/health`
 - `/.netlify/functions/movimientos`
 - `/.netlify/functions/actividad`
+- `/.netlify/functions/comprobantes`
 
 ## Variables de entorno (Netlify Site settings → Environment variables)
 - `GOOGLE_SHEETS_SPREADSHEET_ID` = ID del Google Sheet
 - `GOOGLE_SERVICE_ACCOUNT_EMAIL` = email del Service Account (…@….iam.gserviceaccount.com)
 - `GOOGLE_PRIVATE_KEY` = private key del JSON (ojo con los saltos de línea)
+- `GOOGLE_DRIVE_FOLDER_ID` = ID de la carpeta de Google Drive donde se guardarán los comprobantes/boletas
+- (opcional) `GOOGLE_DRIVE_SHARE_ANYONE` = `true` por defecto para abrir comprobantes con enlace; usa `false` si quieres mantenerlos privados al permiso de la carpeta
 - (opcional) `API_KEY` = una clave simple para exigir `x-api-key` en requests
 - (opcional) `GOOGLE_SHEETS_MOVIMIENTOS_SHEET` = nombre pestaña movimientos (default `Movimientos`)
 - (opcional) `GOOGLE_SHEETS_ACTIVIDAD_SHEET` = nombre pestaña actividad (default `Actividad`)
@@ -19,9 +22,14 @@ Netlify publica automáticamente:
 > Nota: variables definidas en `netlify.toml` NO quedan disponibles para Functions; ponlas en el UI/CLI de Netlify.
 
 ## Google Cloud (Service Account)
-1) Habilita Google Sheets API en tu proyecto.
+1) Habilita Google Sheets API y Google Drive API en tu proyecto.
 2) Crea un Service Account y una key JSON.
 3) Abre tu Google Sheet → Share → agrega el email del Service Account como **Editor**.
+4) Crea una carpeta en tu Google Drive personal para los comprobantes.
+5) Comparte esa carpeta con el email del Service Account como **Editor**.
+6) Copia el ID de la carpeta desde la URL de Drive y configúralo en Netlify como `GOOGLE_DRIVE_FOLDER_ID`.
+
+Los comprobantes tienen límite de 5 MB. Si Google Drive no tiene espacio, la app mostrará un aviso para liberar espacio o actualizar el plan.
 
 ## Front-end (ejemplo rápido)
 ```js

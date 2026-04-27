@@ -624,23 +624,6 @@
           <textarea id="mvDescripcion" rows="3" placeholder="Ej: Pago arriendo Local 12 - Febrero 2026" class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition duration-200" required></textarea>
         </div>
 
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-2">📅 Período Correspondiente</label>
-          <input id="mvPeriodo" type="month" value="2026-02" class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
-        </div>
-
-        <!-- ✅ Estado de Pago -->
-        <div>
-          <label class="block text-sm font-semibold text-gray-700 mb-2">Estado de Pago</label>
-          <select id="mvEstadoPago" class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition duration-200">
-            <option value="">Seleccione...</option>
-            <option>Pendiente</option>
-            <option>Pagado</option>
-            <option>Atrasado</option>
-            <option>Anulado</option>
-          </select>
-        </div>
-
         <!-- ✅ Detalles adicionales (RESTAURADO) -->
         <div class="pt-2">
           <h4 class="text-sm font-bold text-gray-700 flex items-center gap-2">
@@ -703,6 +686,14 @@
             <label class="block text-sm font-semibold text-gray-700 mb-2">Número comprobante</label>
             <input id="mvNumeroComprobante" type="text" placeholder="Ej: 000123"
               class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition duration-200">
+          </div>
+
+          <div>
+            <label class="block text-sm font-semibold text-gray-700 mb-2"><i class="fas fa-paperclip text-purple-600 mr-2"></i>Adjuntar comprobante / boleta</label>
+            <input id="mvComprobanteArchivo" type="file" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt"
+              class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition duration-200 bg-white">
+            <p class="text-xs text-gray-500 mt-1">Máximo 5 MB. Formatos permitidos: imagen, PDF, Word, Excel, CSV o TXT.</p>
+            <p id="mvComprobanteActual" class="hidden text-xs text-purple-700 mt-2"></p>
           </div>
 
           <div class="md:col-span-2">
@@ -983,18 +974,12 @@
       document.getElementById('modalSubmitText').textContent = 'Guardar Movimiento';
       document.getElementById('movementForm')?.reset();
 
-      // defaults hoy / mes
+      // default hoy
       const d = new Date();
       const iso = d.toISOString().slice(0,10);
-      const ym = iso.slice(0,7);
       const fEl = document.getElementById('mvFecha');
       if (fEl) fEl.value = iso;
-      const pEl = document.getElementById('mvPeriodo');
-      if (pEl) pEl.value = ym;
-
-      // ✅ default estado pago vacío
-      const ep = document.getElementById("mvEstadoPago");
-      if (ep) ep.value = "";
+      resetComprobanteInput();
 
       // ✅ limpiar detalles adicionales
       const extraIds = [
@@ -1057,12 +1042,7 @@
       const baseDesc = idx.descripcion >= 0 ? (row[idx.descripcion] || "") : "Convenio";
       if (descEl) descEl.value = `Abono convenio: ${baseDesc}`;
 
-      const periodoEl = document.getElementById('mvPeriodo');
-      if (periodoEl) periodoEl.value = (idx.periodo >= 0 ? (row[idx.periodo] || new Date().toISOString().slice(0,7)) : new Date().toISOString().slice(0,7));
-
-      // EstadoPago normalmente vacío en abonos
-      const ep = document.getElementById('mvEstadoPago');
-      if (ep) ep.value = "";
+      resetComprobanteInput();
 
       // Habilitar monto
       const montoEl = document.getElementById('mvMonto');
@@ -1103,8 +1083,7 @@
         { key: "Descripción", value: get(MOV.idx.descripcion) },
         { key: "Monto", value: montoFmt },
         { key: "Responsable", value: get(MOV.idx.responsable) },
-        { key: "Periodo", value: get(MOV.idx.periodo) },
-        { key: "Estado de Pago", value: get(MOV.idx.estadoPago) },
+        { key: "Comprobante", value: buildComprobanteLink(get(MOV.idx.archivoUrl)) },
         { key: "Local", value: get(MOV.idx.local) },
         { key: "Empleado", value: get(MOV.idx.empleado) },
         { key: "Arrendatario / Propietario", value: get(MOV.idx.arrendatarioPropietario) },
@@ -1159,6 +1138,89 @@
       const data = await res.json().catch(() => ({}));
       if (!res.ok || data.ok === false) throw new Error(data.error || `HTTP ${res.status}`);
       return data;
+    }
+
+    const MAX_COMPROBANTE_BYTES = 5 * 1024 * 1024;
+    const COMPROBANTE_SIZE_ERROR = "El comprobante supera 5 MB. Comprime el archivo o usa uno más liviano.";
+    const DRIVE_FULL_ERROR = "Espacio lleno en Google Drive. Libera espacio o actualiza tu plan de almacenamiento.";
+
+    function resetComprobanteInput(existingUrl = "") {
+      const input = document.getElementById("mvComprobanteArchivo");
+      if (input) input.value = "";
+
+      const info = document.getElementById("mvComprobanteActual");
+      if (!info) return;
+
+      const url = String(existingUrl || "").trim();
+      if (url) {
+        info.classList.remove("hidden");
+        info.innerHTML = `<i class="fas fa-link mr-1"></i>Comprobante actual: <a href="${url}" target="_blank" rel="noopener" class="underline font-semibold">Ver archivo</a>. Si seleccionas otro, se reemplazará el enlace del movimiento.`;
+      } else {
+        info.classList.add("hidden");
+        info.textContent = "";
+      }
+    }
+
+    function buildComprobanteLink(url) {
+      const clean = String(url || "").trim();
+      if (!clean) return "";
+      return `<a href="${clean}" target="_blank" rel="noopener" class="text-purple-700 underline font-semibold"><i class="fas fa-paperclip mr-1"></i>Ver comprobante</a>`;
+    }
+
+    function isDriveStorageErrorText(text) {
+      const t = String(text || "").toLowerCase();
+      return t.includes("storagequotaexceeded") || t.includes("quotaexceeded") || t.includes("storage quota") || t.includes("storage limit") || t.includes("espacio lleno");
+    }
+
+    function getSelectedComprobanteFile() {
+      const input = document.getElementById("mvComprobanteArchivo");
+      const file = input?.files?.[0] || null;
+      if (!file) return null;
+      if (file.size > MAX_COMPROBANTE_BYTES) {
+        if (input) input.value = "";
+        throw new Error(COMPROBANTE_SIZE_ERROR);
+      }
+      return file;
+    }
+
+    async function uploadComprobanteIfSelected(payload = {}) {
+      const file = getSelectedComprobanteFile();
+      if (!file) return "";
+
+      const start = await apiFetch("/.netlify/functions/comprobantes", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "start",
+          fileName: file.name || "comprobante",
+          mimeType: file.type || "application/octet-stream",
+          size: file.size,
+          movementId: EDITING_ID || payload.id || ""
+        })
+      });
+
+      const uploadRes = await fetch(start.uploadUrl, {
+        method: "PUT",
+        headers: { "Content-Type": file.type || "application/octet-stream" },
+        body: file
+      });
+
+      const uploadText = await uploadRes.text().catch(() => "");
+      if (!uploadRes.ok) {
+        if (isDriveStorageErrorText(uploadText)) throw new Error(DRIVE_FULL_ERROR);
+        throw new Error(`No pude subir el comprobante a Google Drive (HTTP ${uploadRes.status}).`);
+      }
+
+      let uploadData = {};
+      try { uploadData = uploadText ? JSON.parse(uploadText) : {}; } catch { uploadData = {}; }
+      const fileId = uploadData.id;
+      if (!fileId) throw new Error("Google Drive no devolvió el ID del comprobante.");
+
+      const final = await apiFetch("/.netlify/functions/comprobantes", {
+        method: "POST",
+        body: JSON.stringify({ action: "finalize", fileId })
+      });
+
+      return final.archivoUrl || uploadData.webViewLink || uploadData.webContentLink || "";
     }
 
 
@@ -1457,6 +1519,7 @@
         numeroComprobante: findCol(header, ["N°Comprobante","NºComprobante","N° Comprobante","Numero Comprobante","Número comprobante","NumeroComprobante"]),
         concepto: findCol(header, ["Concepto"]),
         notas: findCol(header, ["Notas","Nota"]),
+        archivoUrl: findCol(header, ["ArchivoURL","ArchivoUrl","Archivo URL","Archivo Url","archivoUrl","Comprobante","ComprobanteURL","ComprobanteUrl","Comprobante URL","URL Comprobante","Boleta","BoletaURL","Boleta URL"]),
         creadoPorEmail: findCol(header, ["CreadoPorEmail","Creado Por Email","CreadoPorEmail","CreadoPor","Creado Por","CreadoPorMail","Creado Por Mail"]),
 
         // Convenios (columnas nuevas)
@@ -1659,10 +1722,8 @@
       const descripcion = document.getElementById("mvDescripcion")?.value?.trim() || "";
       const monto = Number(document.getElementById("mvMonto")?.value || 0) || 0;
       const convenioTotal = Number(document.getElementById("mvConvenioTotal")?.value || 0) || 0;
-      const periodo = document.getElementById("mvPeriodo")?.value?.trim() || "";
-
-      // ✅ Estado de Pago
-      let estadoPago = document.getElementById("mvEstadoPago")?.value?.trim() || "";
+      const periodo = "";
+      let estadoPago = "";
 
       // ✅ Detalles adicionales (restaurados)
       const local = document.getElementById("mvLocal")?.value?.trim() || "";
@@ -1790,6 +1851,8 @@
       event.preventDefault();
       try {
         const payload = readModalFields();
+        const archivoUrl = await uploadComprobanteIfSelected(payload);
+        if (archivoUrl) payload.archivoUrl = archivoUrl;
 
         if (EDITING_ID) {
           payload.id = EDITING_ID; // PUT espera id en body
@@ -1798,14 +1861,14 @@
             body: JSON.stringify(payload)
           });
           alert(`✅ Movimiento editado!\nID: ${result.id || EDITING_ID}`);
-          logAction("Editar", `${payload.area} · ${payload.tipo} · ${formatCLP(payload.monto)} · ${payload.descripcion} · ${payload.estadoPago || "Sin estado"}`, EDITING_ID);
+          logAction("Editar", `${payload.area} · ${payload.tipo} · ${formatCLP(payload.monto)} · ${payload.descripcion}`, EDITING_ID);
         } else {
           const result = await apiFetch("/.netlify/functions/movimientos", {
             method: "POST",
             body: JSON.stringify(payload)
           });
           alert(`✅ Movimiento guardado!\nID: ${result.id}`);
-          logAction("Crear", `${payload.area} · ${payload.tipo} · ${formatCLP(payload.monto)} · ${payload.descripcion} · ${payload.estadoPago || "Sin estado"}`, result.id);
+          logAction("Crear", `${payload.area} · ${payload.tipo} · ${formatCLP(payload.monto)} · ${payload.descripcion}`, result.id);
         }
 
         closeModal();
@@ -1931,8 +1994,7 @@
         ["Descripción", get(MOV.idx.descripcion)],
         ["Monto", montoFmt],
         ["Responsable", get(MOV.idx.responsable)],
-        ["Periodo", get(MOV.idx.periodo)],
-        ["Estado de Pago", get(MOV.idx.estadoPago)],
+        ["Comprobante", get(MOV.idx.archivoUrl) ? "Ver comprobante: " + get(MOV.idx.archivoUrl) : ""],
         ["Local", get(MOV.idx.local)],
         ["Empleado", get(MOV.idx.empleado)],
         ["Arrendatario / Propietario", get(MOV.idx.arrendatarioPropietario)],
@@ -2077,6 +2139,7 @@
         const descripcion = MOV.idx.descripcion >= 0 ? r[MOV.idx.descripcion] : "";
         const monto = MOV.idx.monto >= 0 ? parseMoney(r[MOV.idx.monto]) : 0;
         const responsable = MOV.idx.responsable >= 0 ? r[MOV.idx.responsable] : "";
+        const archivoUrl = MOV.idx.archivoUrl >= 0 ? (r[MOV.idx.archivoUrl] || "") : "";
 
         const convId = MOV.idx.convenioId >= 0 ? (r[MOV.idx.convenioId] || "") : "";
         const convInfo = convId ? getConvenioInfo(String(convId).trim()) : null;
@@ -2125,6 +2188,7 @@
           <td class="px-6 py-4 whitespace-nowrap text-sm">
             <button class="text-blue-600 hover:text-blue-900 mr-3" data-action="view" data-id="${id}" title="Ver ticket"><i class="fas fa-receipt"></i></button>
             <button class="text-indigo-600 hover:text-indigo-900 mr-3" data-action="print" data-id="${id}" title="Imprimir ticket"><i class="fas fa-print"></i></button>
+            ${archivoUrl ? `<a class="text-purple-600 hover:text-purple-900 mr-3" href="${archivoUrl}" target="_blank" rel="noopener" title="Ver comprobante"><i class="fas fa-paperclip"></i></a>` : ``}
             ${convInfo && convInfo.saldo > 0 ? `<button class="text-emerald-600 hover:text-emerald-900 mr-3" data-action="abonar" data-conv="${convInfo.convId}" title="Registrar abono"><i class="fas fa-coins"></i></button>` : ``}
             ${(() => {
               const _canEdit = canEditRow(r);
@@ -2569,7 +2633,6 @@ function renderResumenMensual() {
       const tipo = idx.tipo >= 0 ? (row[idx.tipo] || "") : "";
       const descripcion = idx.descripcion >= 0 ? (row[idx.descripcion] || "") : "";
       const monto = idx.monto >= 0 ? parseMoney(row[idx.monto]) : 0;
-      const periodo = idx.periodo >= 0 ? (row[idx.periodo] || "") : "";
 
       document.getElementById("mvFecha").value = fecha;
 
@@ -2590,7 +2653,7 @@ function renderResumenMensual() {
 
       document.getElementById("mvDescripcion").value = descripcion;
       document.getElementById("mvMonto").value = Math.abs(monto);
-      if (periodo) document.getElementById("mvPeriodo").value = periodo;
+      resetComprobanteInput(getCell(row, MOV.header, ["ArchivoURL","ArchivoUrl","Archivo URL","Archivo Url","archivoUrl","Comprobante","ComprobanteURL","ComprobanteUrl","Comprobante URL","URL Comprobante","Boleta","BoletaURL","Boleta URL"]));
 
       // Convenio: si la fila tiene Convenio_ID, activar modo convenio y cargar total
       const convId = (idx.convenioId >= 0 ? (row[idx.convenioId] || "") : "").toString().trim();
@@ -2604,12 +2667,6 @@ function renderResumenMensual() {
         if (mEl) mEl.value = 0;
       } else {
         setConvenioMode(false);
-      }
-
-      // ✅ cargar estado pago si viene en el sheet
-      const ep = document.getElementById("mvEstadoPago");
-      if (ep) {
-        ep.value = (idx.estadoPago >= 0 ? (row[idx.estadoPago] || "") : "");
       }
 
       // ✅ cargar detalles adicionales si vienen en el sheet
@@ -2708,6 +2765,13 @@ function renderResumenMensual() {
       showTab("movimientos", firstTabBtn);
 
       document.getElementById("movementForm")?.addEventListener("submit", saveMovement);
+      document.getElementById("mvComprobanteArchivo")?.addEventListener("change", (e) => {
+        const file = e.target.files?.[0];
+        if (file && file.size > MAX_COMPROBANTE_BYTES) {
+          e.target.value = "";
+          alert("❌ Error guardando: " + COMPROBANTE_SIZE_ERROR);
+        }
+      });
 
       // Convenios: toggle modo
       document.getElementById("btnToggleConvenio")?.addEventListener("click", () => {
