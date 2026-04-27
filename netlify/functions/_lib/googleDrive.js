@@ -2,6 +2,8 @@ const { google } = require("googleapis");
 const { Readable } = require("stream");
 
 const DRIVE_FOLDER_ID_ENV = "GOOGLE_DRIVE_FOLDER_ID";
+const APPS_SCRIPT_UPLOAD_URL_ENV = "GOOGLE_APPS_SCRIPT_UPLOAD_URL";
+const APPS_SCRIPT_SECRET_ENV = "COMPROBANTES_UPLOAD_SECRET";
 
 function getEnv(name) {
   const v = process.env[name];
@@ -9,7 +11,11 @@ function getEnv(name) {
   return v;
 }
 
-function getAuth() {
+function getOptionalEnv(name) {
+  return String(process.env[name] || "").trim();
+}
+
+function getServiceAccountAuth() {
   const email = getEnv("GOOGLE_SERVICE_ACCOUNT_EMAIL");
   let key = getEnv("GOOGLE_PRIVATE_KEY");
   key = key.replace(/\\n/g, "\n");
@@ -21,8 +27,18 @@ function getAuth() {
   });
 }
 
-function getDriveClient() {
-  const auth = getAuth();
+function getOAuthAuth() {
+  const clientId = getOptionalEnv("GOOGLE_DRIVE_CLIENT_ID");
+  const clientSecret = getOptionalEnv("GOOGLE_DRIVE_CLIENT_SECRET");
+  const refreshToken = getOptionalEnv("GOOGLE_DRIVE_REFRESH_TOKEN");
+  if (!clientId || !clientSecret || !refreshToken) return null;
+
+  const auth = new google.auth.OAuth2(clientId, clientSecret);
+  auth.setCredentials({ refresh_token: refreshToken });
+  return auth;
+}
+
+function getDriveClient(auth) {
   return google.drive({ version: "v3", auth });
 }
 
@@ -67,14 +83,24 @@ function friendlyDriveError(err) {
   const haystack = `${String(reason).toLowerCase()} ${raw}`;
 
   if (haystack.includes("storagequotaexceeded") || haystack.includes("quotaexceeded") || haystack.includes("storage quota") || haystack.includes("storage limit")) {
-    const e = new Error("Espacio lleno en Google Drive. Libera espacio o actualiza tu plan de almacenamiento y vuelve a intentar.");
+    const configuredAppsScript = Boolean(getOptionalEnv(APPS_SCRIPT_UPLOAD_URL_ENV));
+    const msg = configuredAppsScript
+      ? "Espacio lleno en Google Drive. Libera espacio o actualiza tu plan de almacenamiento y vuelve a intentar."
+      : "Google Drive rechazó la subida con el Service Account porque no tiene cuota de almacenamiento. Para Gmail personal usa la versión con Apps Script: configura GOOGLE_APPS_SCRIPT_UPLOAD_URL y COMPROBANTES_UPLOAD_SECRET.";
+    const e = new Error(msg);
     e.statusCode = 507;
     return e;
   }
 
   if (haystack.includes("filenotfound") || haystack.includes("not found") || haystack.includes("insufficientfilepermissions") || haystack.includes("permission")) {
-    const e = new Error("No pude subir el comprobante: revisa GOOGLE_DRIVE_FOLDER_ID y que la carpeta esté compartida con el Service Account.");
+    const e = new Error("No pude subir el comprobante: revisa GOOGLE_DRIVE_FOLDER_ID y que la carpeta/endpoint tenga permisos correctos.");
     e.statusCode = 500;
+    return e;
+  }
+
+  if (haystack.includes("invalid_grant") || haystack.includes("invalid credentials")) {
+    const e = new Error("No pude autenticar Google Drive. Revisa GOOGLE_DRIVE_REFRESH_TOKEN o vuelve a autorizar la conexión OAuth.");
+    e.statusCode = 401;
     return e;
   }
 
@@ -90,11 +116,10 @@ async function getAccessToken(auth) {
   throw new Error("No pude obtener token de Google Drive.");
 }
 
-// Se deja esta función por compatibilidad, pero la app nueva sube por Netlify
-// para evitar el error de navegador "Failed to fetch" por CORS hacia Google.
+// Se deja esta función por compatibilidad con una versión anterior.
 async function createResumableUploadSession({ fileName, mimeType, size, movementId }) {
   const folderId = getDriveFolderId();
-  const auth = getAuth();
+  const auth = getOAuthAuth() || getServiceAccountAuth();
   const token = await getAccessToken(auth);
   const name = makeDriveFileName({ fileName, movementId });
 
@@ -146,33 +171,77 @@ async function makeFileReadableByLink(drive, fileId) {
   }
 }
 
-async function uploadDriveFileFromBuffer({ buffer, fileName, mimeType, movementId }) {
+async function uploadViaAppsScript({ buffer, fileName, mimeType, movementId }) {
+  const endpoint = getOptionalEnv(APPS_SCRIPT_UPLOAD_URL_ENV);
+  if (!endpoint) return null;
+
+  const name = makeDriveFileName({ fileName, movementId });
+  const body = {
+    secret: getOptionalEnv(APPS_SCRIPT_SECRET_ENV),
+    fileName: name,
+    mimeType: mimeType || "application/octet-stream",
+    movementId: movementId || "",
+    base64: Buffer.from(buffer).toString("base64"),
+  };
+
+  const resp = await fetch(endpoint, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify(body),
+  });
+
+  let data = {};
+  const text = await resp.text().catch(() => "");
+  try { data = text ? JSON.parse(text) : {}; } catch { data = { ok: false, error: text }; }
+
+  if (!resp.ok || data.ok === false) {
+    const e = new Error(data.error || `Apps Script upload failed (${resp.status})`);
+    e.code = resp.status;
+    throw friendlyDriveError(e);
+  }
+
+  return {
+    id: data.fileId || data.id || "",
+    name: data.name || name,
+    webViewLink: data.archivoUrl || data.webViewLink || data.url || "",
+    webContentLink: data.webContentLink || "",
+  };
+}
+
+async function uploadViaDriveApi({ buffer, fileName, mimeType, movementId }) {
   const folderId = getDriveFolderId();
-  const drive = getDriveClient();
+  const auth = getOAuthAuth() || getServiceAccountAuth();
+  const drive = getDriveClient(auth);
   const name = makeDriveFileName({ fileName, movementId });
 
+  const created = await drive.files.create({
+    requestBody: {
+      name,
+      parents: [folderId],
+    },
+    media: {
+      mimeType: mimeType || "application/octet-stream",
+      body: Readable.from(buffer),
+    },
+    fields: "id,name,webViewLink,webContentLink",
+  });
+
+  const fileId = created.data.id;
+  await makeFileReadableByLink(drive, fileId);
+
+  const final = await drive.files.get({
+    fileId,
+    fields: "id,name,webViewLink,webContentLink",
+  });
+
+  return final.data;
+}
+
+async function uploadDriveFileFromBuffer({ buffer, fileName, mimeType, movementId }) {
   try {
-    const created = await drive.files.create({
-      requestBody: {
-        name,
-        parents: [folderId],
-      },
-      media: {
-        mimeType: mimeType || "application/octet-stream",
-        body: Readable.from(buffer),
-      },
-      fields: "id,name,webViewLink,webContentLink",
-    });
-
-    const fileId = created.data.id;
-    await makeFileReadableByLink(drive, fileId);
-
-    const final = await drive.files.get({
-      fileId,
-      fields: "id,name,webViewLink,webContentLink",
-    });
-
-    return final.data;
+    const viaAppsScript = await uploadViaAppsScript({ buffer, fileName, mimeType, movementId });
+    if (viaAppsScript) return viaAppsScript;
+    return await uploadViaDriveApi({ buffer, fileName, mimeType, movementId });
   } catch (err) {
     throw friendlyDriveError(err);
   }
@@ -185,7 +254,8 @@ async function finalizeDriveFile(fileId) {
     throw e;
   }
 
-  const drive = getDriveClient();
+  const auth = getOAuthAuth() || getServiceAccountAuth();
+  const drive = getDriveClient(auth);
   await makeFileReadableByLink(drive, fileId);
 
   try {

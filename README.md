@@ -1,52 +1,73 @@
-# Anfiteatro (Google Sheets como BD) + Netlify Functions
+# Anfiteatro System - Netlify + Google Sheets
 
-Este starter expone endpoints para **Movimientos** y **Actividad** usando Google Sheets como "base de datos".
+App conectada a Google Sheets como base de datos de movimientos.
 
-## Endpoints (Netlify)
-Netlify publica automáticamente:
-- `/.netlify/functions/health`
-- `/.netlify/functions/movimientos`
-- `/.netlify/functions/actividad`
-- `/.netlify/functions/comprobantes`
+## Cambio agregado
 
-## Variables de entorno (Netlify Site settings → Environment variables)
-- `GOOGLE_SHEETS_SPREADSHEET_ID` = ID del Google Sheet
-- `GOOGLE_SERVICE_ACCOUNT_EMAIL` = email del Service Account (…@….iam.gserviceaccount.com)
-- `GOOGLE_PRIVATE_KEY` = private key del JSON (ojo con los saltos de línea)
-- `GOOGLE_DRIVE_FOLDER_ID` = ID de la carpeta de Google Drive donde se guardarán los comprobantes/boletas
-- (opcional) `GOOGLE_DRIVE_SHARE_ANYONE` = `true` por defecto para abrir comprobantes con enlace; usa `false` si quieres mantenerlos privados al permiso de la carpeta
-- (opcional) `API_KEY` = una clave simple para exigir `x-api-key` en requests
-- (opcional) `GOOGLE_SHEETS_MOVIMIENTOS_SHEET` = nombre pestaña movimientos (default `Movimientos`)
-- (opcional) `GOOGLE_SHEETS_ACTIVIDAD_SHEET` = nombre pestaña actividad (default `Actividad`)
+- Adjuntar comprobante / boleta al crear o editar un movimiento.
+- Límite máximo por archivo: 5 MB.
+- Formatos permitidos desde la app: imagen, PDF, Word, Excel, CSV o TXT.
+- Se eliminó el uso visible de los campos Período Correspondiente y Estado de Pago en el formulario de movimiento.
 
-> Nota: variables definidas en `netlify.toml` NO quedan disponibles para Functions; ponlas en el UI/CLI de Netlify.
+## Importante para Gmail personal
 
-## Google Cloud (Service Account)
-1) Habilita Google Sheets API y Google Drive API en tu proyecto.
-2) Crea un Service Account y una key JSON.
-3) Abre tu Google Sheet → Share → agrega el email del Service Account como **Editor**.
-4) Crea una carpeta en tu Google Drive personal para los comprobantes.
-5) Comparte esa carpeta con el email del Service Account como **Editor**.
-6) Copia el ID de la carpeta desde la URL de Drive y configúralo en Netlify como `GOOGLE_DRIVE_FOLDER_ID`.
+Si usas Google Drive personal, no uses Service Account para subir archivos a Drive. Google puede devolver `storageQuotaExceeded` aunque tu cuenta tenga espacio, porque el Service Account no tiene cuota de almacenamiento propia.
 
-Los comprobantes tienen límite de 5 MB. Si Google Drive no tiene espacio, la app mostrará un aviso para liberar espacio o actualizar el plan.
+La solución recomendada incluida en esta versión es subir los comprobantes mediante Google Apps Script, ejecutado como tu usuario Gmail personal.
 
-## Front-end (ejemplo rápido)
-```js
-await fetch('/.netlify/functions/movimientos', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json', 'x-api-key': 'TU_API_KEY' },
-  body: JSON.stringify({
-    fecha: '2026-02-06',
-    area: 'Arriendos',
-    tipo: 'Ingreso',
-    descripcion: 'Pago arriendo Local 12 - Febrero',
-    monto: 450000,
-    responsable: 'Admin',
-    periodo: '2026-02'
-  })
-});
-```
+La conexión actual con Google Sheets queda igual y no debes cambiarla.
 
-## Correr local
-- Instala Netlify CLI y ejecuta `netlify dev` (Netlify Dev puede cargar variables desde Netlify o `.env` local).
+## Variables de entorno existentes que NO debes cambiar si ya funcionan
+
+- `GOOGLE_SHEETS_SPREADSHEET_ID`
+- `GOOGLE_SERVICE_ACCOUNT_EMAIL`
+- `GOOGLE_PRIVATE_KEY`
+- `AUTH_JWT_SECRET`
+- `API_KEY`, si la usas
+
+## Variables nuevas para comprobantes con Google Apps Script
+
+Agrega en Netlify:
+
+- `GOOGLE_APPS_SCRIPT_UPLOAD_URL`
+- `COMPROBANTES_UPLOAD_SECRET`
+
+`GOOGLE_DRIVE_FOLDER_ID` ya no es necesario si usas Apps Script, porque el ID de carpeta queda dentro del script de Google.
+
+## Apps Script
+
+El archivo listo para copiar está en:
+
+`tools/apps-script-comprobantes.gs`
+
+### Pasos rápidos
+
+1. Crea una carpeta en tu Google Drive personal, por ejemplo `Comprobantes Anfiteatro`.
+2. Copia el ID de esa carpeta desde la URL.
+3. Entra a https://script.google.com/ y crea un proyecto nuevo.
+4. Pega el contenido de `tools/apps-script-comprobantes.gs`.
+5. Cambia `FOLDER_ID` por el ID de tu carpeta.
+6. Cambia `SECRET` por una clave larga inventada por ti.
+7. Clic en Deploy > New deployment.
+8. Tipo: Web app.
+9. Execute as: Me.
+10. Who has access: Anyone.
+11. Copia la URL que termina en `/exec`.
+12. En Netlify crea `GOOGLE_APPS_SCRIPT_UPLOAD_URL` con esa URL.
+13. En Netlify crea `COMPROBANTES_UPLOAD_SECRET` con la misma clave que pusiste en `SECRET`.
+14. Redespliega Netlify.
+
+## Prueba
+
+1. Crea un movimiento nuevo.
+2. Adjunta una imagen o PDF menor a 5 MB.
+3. Guarda.
+4. Revisa la carpeta de Drive: debe aparecer el comprobante.
+
+Si subes un archivo mayor a 5 MB, la app mostrará:
+
+`❌ Error guardando: El comprobante supera 5 MB. Comprime el archivo o usa uno más liviano.`
+
+Si Drive personal realmente está sin espacio, la app mostrará:
+
+`❌ Error guardando: Espacio lleno en Google Drive. Libera espacio o actualiza tu plan de almacenamiento.`

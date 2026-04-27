@@ -1,13 +1,9 @@
 const { json, requireApiKey } = require("./_lib/http");
 const { requireAuth } = require("./_lib/auth");
-const {
-  createResumableUploadSession,
-  finalizeDriveFile,
-  uploadDriveFileFromBuffer,
-} = require("./_lib/googleDrive");
 
 const MAX_COMPROBANTE_BYTES = 5 * 1024 * 1024;
 const FILE_TOO_LARGE_MSG = "El comprobante supera 5 MB. Comprime el archivo o usa uno más liviano.";
+const DRIVE_FULL_MSG = "Espacio lleno en Google Drive. Libera espacio o actualiza tu plan de almacenamiento.";
 
 function withCors(resp) {
   resp.headers = {
@@ -17,11 +13,6 @@ function withCors(resp) {
     "Access-Control-Allow-Methods": "POST,OPTIONS",
   };
   return resp;
-}
-
-function safeJsonParse(body) {
-  try { return JSON.parse(body || "{}"); }
-  catch { return {}; }
 }
 
 function getHeader(event, name) {
@@ -105,8 +96,76 @@ function parseMultipart(event) {
   return { fields, files };
 }
 
+function normalizeAppsScriptUrl(url) {
+  const clean = String(url || "").trim();
+  if (!clean) return "";
+  // La URL debe ser la /exec, sin ?secret=. Si viene con parámetros, los quitamos.
+  return clean.split("?")[0];
+}
+
+function isDriveStorageErrorText(text) {
+  const t = String(text || "").toLowerCase();
+  return (
+    t.includes("storagequotaexceeded") ||
+    t.includes("quotaexceeded") ||
+    t.includes("storage quota") ||
+    t.includes("storage limit") ||
+    t.includes("quota") ||
+    t.includes("espacio")
+  );
+}
+
+async function uploadViaAppsScript(file) {
+  const uploadUrl = normalizeAppsScriptUrl(process.env.GOOGLE_APPS_SCRIPT_UPLOAD_URL);
+  const secret = String(process.env.COMPROBANTES_UPLOAD_SECRET || "").trim();
+
+  if (!uploadUrl) {
+    const e = new Error("Falta GOOGLE_APPS_SCRIPT_UPLOAD_URL en Netlify.");
+    e.statusCode = 500;
+    throw e;
+  }
+
+  if (!secret) {
+    const e = new Error("Falta COMPROBANTES_UPLOAD_SECRET en Netlify.");
+    e.statusCode = 500;
+    throw e;
+  }
+
+  const body = {
+    secret,
+    fileName: file.fileName || "comprobante",
+    mimeType: file.mimeType || "application/octet-stream",
+    base64: file.buffer.toString("base64"),
+  };
+
+  const response = await fetch(uploadUrl, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify(body),
+  });
+
+  const raw = await response.text();
+  let data = {};
+  try {
+    data = JSON.parse(raw || "{}");
+  } catch (parseErr) {
+    const e = new Error(`Apps Script respondió algo inválido: ${raw.slice(0, 250)}`);
+    e.statusCode = 502;
+    throw e;
+  }
+
+  if (!response.ok || data.ok === false) {
+    const msg = data.error || `Apps Script HTTP ${response.status}`;
+    const e = new Error(isDriveStorageErrorText(msg) ? DRIVE_FULL_MSG : msg);
+    e.statusCode = response.ok ? 400 : response.status;
+    throw e;
+  }
+
+  return data;
+}
+
 async function uploadFromMultipart(event) {
-  const { fields, files } = parseMultipart(event);
+  const { files } = parseMultipart(event);
   const file = files.find(f => f.fieldName === "file") || files[0];
 
   if (!file || !file.size) {
@@ -117,18 +176,13 @@ async function uploadFromMultipart(event) {
     return json(400, { ok: false, error: FILE_TOO_LARGE_MSG });
   }
 
-  const uploaded = await uploadDriveFileFromBuffer({
-    buffer: file.buffer,
-    fileName: file.fileName,
-    mimeType: file.mimeType,
-    movementId: fields.movementId || "",
-  });
+  const uploaded = await uploadViaAppsScript(file);
 
   return json(200, {
     ok: true,
-    fileId: uploaded.id,
-    name: uploaded.name,
-    archivoUrl: uploaded.webViewLink || uploaded.webContentLink || `https://drive.google.com/file/d/${uploaded.id}/view`,
+    fileId: uploaded.fileId || uploaded.id || "",
+    name: uploaded.name || file.fileName,
+    archivoUrl: uploaded.archivoUrl || uploaded.url || "",
   });
 }
 
@@ -137,6 +191,7 @@ exports.handler = async (event) => {
     if (event.httpMethod === "OPTIONS") {
       return withCors({ statusCode: 200, headers: {}, body: JSON.stringify({ ok: true }) });
     }
+
     if (event.httpMethod !== "POST") {
       return withCors(json(405, { ok: false, error: "Method not allowed" }));
     }
@@ -145,41 +200,13 @@ exports.handler = async (event) => {
     requireAuth(event);
 
     const contentType = getHeader(event, "content-type");
-    if (contentType.toLowerCase().startsWith("multipart/form-data")) {
-      return withCors(await uploadFromMultipart(event));
+    if (!contentType.toLowerCase().startsWith("multipart/form-data")) {
+      return withCors(json(400, { ok: false, error: "Solicitud inválida: se esperaba multipart/form-data." }));
     }
 
-    const payload = safeJsonParse(event.body);
-    const action = String(payload.action || "").trim().toLowerCase();
-
-    // Compatibilidad con la versión anterior.
-    if (action === "start") {
-      const fileName = String(payload.fileName || "comprobante").trim();
-      const mimeType = String(payload.mimeType || "application/octet-stream").trim();
-      const size = Number(payload.size || 0);
-      const movementId = String(payload.movementId || "").trim();
-
-      if (!size || size < 0) return withCors(json(400, { ok: false, error: "El comprobante no tiene tamaño válido." }));
-      if (size > MAX_COMPROBANTE_BYTES) return withCors(json(400, { ok: false, error: FILE_TOO_LARGE_MSG }));
-
-      const session = await createResumableUploadSession({ fileName, mimeType, size, movementId });
-      return withCors(json(200, { ok: true, ...session }));
-    }
-
-    if (action === "finalize") {
-      const fileId = String(payload.fileId || "").trim();
-      const file = await finalizeDriveFile(fileId);
-      return withCors(json(200, {
-        ok: true,
-        fileId: file.id,
-        name: file.name,
-        archivoUrl: file.webViewLink || file.webContentLink || `https://drive.google.com/file/d/${file.id}/view`,
-      }));
-    }
-
-    return withCors(json(400, { ok: false, error: "Acción inválida para comprobante." }));
+    return withCors(await uploadFromMultipart(event));
   } catch (err) {
-    const status = err.statusCode || err.code || 500;
+    const status = Number(err.statusCode || err.code || 500);
     return withCors(json(status, { ok: false, error: err.message || String(err) }));
   }
 };
