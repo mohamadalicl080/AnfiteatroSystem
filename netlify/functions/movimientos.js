@@ -191,19 +191,19 @@ async function trashComprobanteByUrl(archivoUrl, { required = false } = {}) {
     return { ok: false, warning: msg };
   }
 
-  const params = new URLSearchParams();
-  params.set("secret", secret);
-  params.set("action", "delete");
-  if (fileId) params.set("fileId", fileId);
-  params.set("archivoUrl", clean);
-
   try {
-    // Borrado por POST x-www-form-urlencoded. Apps Script lo recibe en e.parameter,
-    // que es más confiable para acciones pequeñas que parsear JSON manualmente.
+    // v12: borrado SOLO por POST JSON/text/plain, igual que la subida.
+    // No usa GET ni form-urlencoded porque Google puede responder HTML o porque
+    // Apps Script antiguo intenta parsear "secret=..." como JSON.
     const response = await fetch(uploadUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded;charset=utf-8" },
-      body: params.toString(),
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({
+        secret,
+        action: "delete",
+        fileId,
+        archivoUrl: clean,
+      }),
       redirect: "follow",
     });
 

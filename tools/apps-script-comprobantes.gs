@@ -11,9 +11,9 @@
  * 5) Copia la URL /exec y ponla en Netlify como GOOGLE_APPS_SCRIPT_UPLOAD_URL.
  * 6) Pon la misma clave SECRET en Netlify como COMPROBANTES_UPLOAD_SECRET.
  *
- * Versión v11:
+ * Versión v12:
  * - Sube archivos por POST con JSON/base64.
- * - Elimina archivos por POST usando application/x-www-form-urlencoded o JSON.
+ * - Elimina archivos por POST usando JSON/text/plain o form-urlencoded.
  * - doGet solo sirve para diagnóstico.
  */
 
@@ -247,8 +247,8 @@ function doGet(e) {
       canUpload: true,
       canDelete: true,
       actions: ['upload', 'delete'],
-      deleteMethod: 'POST form-urlencoded',
-      version: 'v11',
+      deleteMethod: 'POST JSON/text/plain',
+      version: 'v12',
       storageLimit: storageLimit,
       storageUsed: storageUsed,
       testFileCreated: true,
