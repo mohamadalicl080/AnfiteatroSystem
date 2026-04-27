@@ -1187,41 +1187,26 @@
       const file = getSelectedComprobanteFile();
       if (!file) return "";
 
-      const start = await apiFetch("/.netlify/functions/comprobantes", {
+      const formData = new FormData();
+      formData.append("movementId", EDITING_ID || payload.id || "");
+      formData.append("file", file, file.name || "comprobante");
+
+      const res = await fetch("/.netlify/functions/comprobantes", {
         method: "POST",
-        body: JSON.stringify({
-          action: "start",
-          fileName: file.name || "comprobante",
-          mimeType: file.type || "application/octet-stream",
-          size: file.size,
-          movementId: EDITING_ID || payload.id || ""
-        })
+        headers: { ...(authToken ? { "Authorization": `Bearer ${authToken}` } : {}) },
+        body: formData
       });
 
-      const uploadRes = await fetch(start.uploadUrl, {
-        method: "PUT",
-        headers: { "Content-Type": file.type || "application/octet-stream" },
-        body: file
-      });
-
-      const uploadText = await uploadRes.text().catch(() => "");
-      if (!uploadRes.ok) {
-        if (isDriveStorageErrorText(uploadText)) throw new Error(DRIVE_FULL_ERROR);
-        throw new Error(`No pude subir el comprobante a Google Drive (HTTP ${uploadRes.status}).`);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.ok === false) {
+        const msg = data.error || `HTTP ${res.status}`;
+        if (isDriveStorageErrorText(msg)) throw new Error(DRIVE_FULL_ERROR);
+        throw new Error(msg);
       }
 
-      let uploadData = {};
-      try { uploadData = uploadText ? JSON.parse(uploadText) : {}; } catch { uploadData = {}; }
-      const fileId = uploadData.id;
-      if (!fileId) throw new Error("Google Drive no devolvió el ID del comprobante.");
-
-      const final = await apiFetch("/.netlify/functions/comprobantes", {
-        method: "POST",
-        body: JSON.stringify({ action: "finalize", fileId })
-      });
-
-      return final.archivoUrl || uploadData.webViewLink || uploadData.webContentLink || "";
+      return data.archivoUrl || "";
     }
+
 
 
     async function initAuth() {

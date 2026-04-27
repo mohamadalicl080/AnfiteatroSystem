@@ -1,4 +1,5 @@
 const { google } = require("googleapis");
+const { Readable } = require("stream");
 
 const DRIVE_FOLDER_ID_ENV = "GOOGLE_DRIVE_FOLDER_ID";
 
@@ -89,6 +90,8 @@ async function getAccessToken(auth) {
   throw new Error("No pude obtener token de Google Drive.");
 }
 
+// Se deja esta función por compatibilidad, pero la app nueva sube por Netlify
+// para evitar el error de navegador "Failed to fetch" por CORS hacia Google.
 async function createResumableUploadSession({ fileName, mimeType, size, movementId }) {
   const folderId = getDriveFolderId();
   const auth = getAuth();
@@ -128,6 +131,53 @@ async function createResumableUploadSession({ fileName, mimeType, size, movement
   return { uploadUrl, name };
 }
 
+async function makeFileReadableByLink(drive, fileId) {
+  if (String(process.env.GOOGLE_DRIVE_SHARE_ANYONE || "true").toLowerCase() === "false") return;
+
+  try {
+    await drive.permissions.create({
+      fileId,
+      requestBody: { role: "reader", type: "anyone" },
+    });
+  } catch (err) {
+    // Si no se puede publicar el enlace, igual devolvemos el link Drive.
+    // El dueño de la carpeta o usuarios con permiso podrán abrirlo.
+    console.warn("No pude publicar comprobante con enlace:", err?.message || err);
+  }
+}
+
+async function uploadDriveFileFromBuffer({ buffer, fileName, mimeType, movementId }) {
+  const folderId = getDriveFolderId();
+  const drive = getDriveClient();
+  const name = makeDriveFileName({ fileName, movementId });
+
+  try {
+    const created = await drive.files.create({
+      requestBody: {
+        name,
+        parents: [folderId],
+      },
+      media: {
+        mimeType: mimeType || "application/octet-stream",
+        body: Readable.from(buffer),
+      },
+      fields: "id,name,webViewLink,webContentLink",
+    });
+
+    const fileId = created.data.id;
+    await makeFileReadableByLink(drive, fileId);
+
+    const final = await drive.files.get({
+      fileId,
+      fields: "id,name,webViewLink,webContentLink",
+    });
+
+    return final.data;
+  } catch (err) {
+    throw friendlyDriveError(err);
+  }
+}
+
 async function finalizeDriveFile(fileId) {
   if (!fileId) {
     const e = new Error("Falta fileId de Google Drive.");
@@ -136,19 +186,7 @@ async function finalizeDriveFile(fileId) {
   }
 
   const drive = getDriveClient();
-
-  if (String(process.env.GOOGLE_DRIVE_SHARE_ANYONE || "true").toLowerCase() !== "false") {
-    try {
-      await drive.permissions.create({
-        fileId,
-        requestBody: { role: "reader", type: "anyone" },
-      });
-    } catch (err) {
-      // Si no se puede publicar el enlace, igual devolvemos el link Drive.
-      // El dueño de la carpeta o usuarios con permiso podrán abrirlo.
-      console.warn("No pude publicar comprobante con enlace:", err?.message || err);
-    }
-  }
+  await makeFileReadableByLink(drive, fileId);
 
   try {
     const res = await drive.files.get({
@@ -164,5 +202,6 @@ async function finalizeDriveFile(fileId) {
 module.exports = {
   createResumableUploadSession,
   finalizeDriveFile,
+  uploadDriveFileFromBuffer,
   friendlyDriveError,
 };
