@@ -24,6 +24,59 @@
     return colIdx >= 0 ? (row[colIdx] ?? "") : "";
   }
 
+  function escapeHtml(value) {
+    return String(value ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+
+  function extractDriveFileId(url) {
+    const clean = String(url || "").trim();
+    if (!clean) return "";
+    let match = clean.match(/\/file\/d\/([^/?#]+)/i);
+    if (match && match[1]) return decodeURIComponent(match[1]);
+    match = clean.match(/[?&]id=([^&#]+)/i);
+    if (match && match[1]) return decodeURIComponent(match[1]);
+    match = clean.match(/\/open\?id=([^&#]+)/i);
+    if (match && match[1]) return decodeURIComponent(match[1]);
+    return "";
+  }
+
+  function driveThumbnailUrl(url, size = "w900") {
+    const id = extractDriveFileId(url);
+    return id ? `https://drive.google.com/thumbnail?id=${encodeURIComponent(id)}&sz=${encodeURIComponent(size)}` : String(url || "").trim();
+  }
+
+  function looksLikeImageUrl(url) {
+    return /\.(png|jpe?g|gif|webp|bmp|svg)(\?|#|$)/i.test(String(url || ""));
+  }
+
+  function looksLikePdfUrl(url) {
+    return /\.pdf(\?|#|$)/i.test(String(url || ""));
+  }
+
+  function buildAttachmentPreview(url) {
+    const clean = String(url || "").trim();
+    if (!clean) return "";
+    const href = escapeHtml(clean);
+    const thumb = escapeHtml(driveThumbnailUrl(clean));
+    const canInline = !!extractDriveFileId(clean) || looksLikeImageUrl(clean) || looksLikePdfUrl(clean);
+
+    return `
+      <div class="mt-4 border-t border-gray-200 pt-4">
+        <div class="text-sm font-semibold text-gray-700 mb-2"><i class="fas fa-paperclip text-purple-600 mr-2"></i>Comprobante adjunto</div>
+        ${canInline ? `
+          <img src="${thumb}" alt="Comprobante adjunto" class="w-full max-h-80 object-contain rounded-xl border border-gray-200 bg-gray-50" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+          <div class="hidden text-sm text-gray-600">No se pudo mostrar la vista previa. Abre el comprobante desde el enlace.</div>
+        ` : ``}
+        <a href="${href}" target="_blank" rel="noopener" class="inline-block mt-2 text-sm text-purple-700 underline font-semibold">Abrir comprobante completo</a>
+      </div>
+    `;
+  }
+
   function buildTicketInnerHTMLFromRow(row) {
     if (!row || !window.MOV || !MOV.idx) return "<div class='text-sm text-gray-600'>No se pudo construir el ticket.</div>";
 
@@ -34,6 +87,7 @@
 
     const montoBase = isAnulado ? 0 : Math.abs(rawMonto);
     const montoFmt = (tipo === "Egreso" ? "-" : "") + (formatCLP ? formatCLP(montoBase).replace("-", "") : String(montoBase));
+    const archivoUrl = getCell(row, MOV.idx.archivoUrl);
 
     const fields = [
       { key: "ID", value: getCell(row, MOV.idx.id) },
@@ -43,7 +97,7 @@
       { key: "Descripción", value: getCell(row, MOV.idx.descripcion) },
       { key: "Monto", value: montoFmt },
       { key: "Responsable", value: getCell(row, MOV.idx.responsable) },
-      { key: "Comprobante", value: getCell(row, MOV.idx.archivoUrl) ? "Ver comprobante: " + getCell(row, MOV.idx.archivoUrl) : "" },
+      { key: "Comprobante", value: archivoUrl ? "Ver comprobante: " + archivoUrl : "" },
       { key: "Local", value: getCell(row, MOV.idx.local) },
       { key: "Empleado", value: getCell(row, MOV.idx.empleado) },
       { key: "Arrendatario / Propietario", value: getCell(row, MOV.idx.arrendatarioPropietario) },
@@ -82,6 +136,7 @@
             </div>
           `).join("")}
         </dl>
+        ${buildAttachmentPreview(archivoUrl)}
       </div>
     `;
   }
