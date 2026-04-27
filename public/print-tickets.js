@@ -58,6 +58,28 @@
     return /\.pdf(\?|#|$)/i.test(String(url || ""));
   }
 
+  function looksLikeArchivoUrl(value) {
+    const clean = String(value || "").trim();
+    if (!/^https?:\/\//i.test(clean)) return false;
+    return clean.includes("drive.google.com")
+      || clean.includes("docs.google.com")
+      || /\.(png|jpe?g|gif|webp|bmp|svg|pdf|docx?|xlsx?|csv|txt)(\?|#|$)/i.test(clean);
+  }
+
+  function getArchivoUrlFromRow(row) {
+    const candidates = [];
+    if (window.MOV?.idx?.archivoUrl >= 0) candidates.push(row[MOV.idx.archivoUrl]);
+    candidates.push(row?.[19]);
+
+    for (const value of candidates) {
+      const clean = String(value || "").trim();
+      if (looksLikeArchivoUrl(clean)) return clean;
+    }
+
+    const found = (row || []).find(looksLikeArchivoUrl);
+    return String(found || "").trim();
+  }
+
   function buildAttachmentPreview(url) {
     const clean = String(url || "").trim();
     if (!clean) return "";
@@ -87,7 +109,7 @@
 
     const montoBase = isAnulado ? 0 : Math.abs(rawMonto);
     const montoFmt = (tipo === "Egreso" ? "-" : "") + (formatCLP ? formatCLP(montoBase).replace("-", "") : String(montoBase));
-    const archivoUrl = getCell(row, MOV.idx.archivoUrl);
+    const archivoUrl = getArchivoUrlFromRow(row);
 
     const fields = [
       { key: "ID", value: getCell(row, MOV.idx.id) },

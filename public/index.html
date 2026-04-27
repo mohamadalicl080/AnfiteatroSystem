@@ -1074,7 +1074,7 @@
       const isAnulado = isAnuladoEstado(estadoPagoRaw);
       const montoBase = isAnulado ? 0 : Math.abs(rawMonto);
       const montoFmt = (tipo === "Egreso" ? "-" : "") + formatCLP(montoBase).replace("-", "");
-      const archivoUrl = get(MOV.idx.archivoUrl);
+      const archivoUrl = getArchivoUrlFromRow(row);
 
       const fields = [
         { key: "ID", value: get(MOV.idx.id) },
@@ -1201,6 +1201,34 @@
     function looksLikePdfUrl(url) {
       return /\.pdf(\?|#|$)/i.test(String(url || ""));
     }
+    function looksLikeArchivoUrl(value) {
+      const clean = String(value || "").trim();
+      if (!/^https?:\/\//i.test(clean)) return false;
+      return clean.includes("drive.google.com")
+        || clean.includes("docs.google.com")
+        || /\.(png|jpe?g|gif|webp|bmp|svg|pdf|docx?|xlsx?|csv|txt)(\?|#|$)/i.test(clean);
+    }
+
+    function getArchivoUrlFromRow(row) {
+      const candidates = [];
+
+      // 1) Si el encabezado del Sheet existe con nombre ArchivoURL/Comprobante, usarlo.
+      if (MOV?.idx?.archivoUrl >= 0) candidates.push(row[MOV.idx.archivoUrl]);
+
+      // 2) Fallback fijo: la función Netlify guarda el link en la columna T (índice 19).
+      //    Esto soluciona Sheets antiguos que no tienen el encabezado ArchivoURL.
+      candidates.push(row?.[19]);
+
+      for (const value of candidates) {
+        const clean = String(value || "").trim();
+        if (looksLikeArchivoUrl(clean)) return clean;
+      }
+
+      // 3) Último fallback: buscar cualquier link de Drive/archivo en toda la fila.
+      const found = (row || []).find(looksLikeArchivoUrl);
+      return String(found || "").trim();
+    }
+
 
     function buildComprobanteLink(url) {
       const clean = String(url || "").trim();
@@ -2057,7 +2085,7 @@
       const isAnulado = isAnuladoEstado(estadoPagoRaw);
       const montoBase = isAnulado ? 0 : Math.abs(rawMonto);
       const montoFmt = (tipo === "Egreso" ? "-" : "") + formatCLP(montoBase).replace("-", "");
-      const archivoUrl = get(MOV.idx.archivoUrl);
+      const archivoUrl = getArchivoUrlFromRow(row);
 
       const fields = [
         ["ID", get(MOV.idx.id)],
@@ -2217,7 +2245,7 @@
         const descripcion = MOV.idx.descripcion >= 0 ? r[MOV.idx.descripcion] : "";
         const monto = MOV.idx.monto >= 0 ? parseMoney(r[MOV.idx.monto]) : 0;
         const responsable = MOV.idx.responsable >= 0 ? r[MOV.idx.responsable] : "";
-        const archivoUrl = MOV.idx.archivoUrl >= 0 ? (r[MOV.idx.archivoUrl] || "") : "";
+        const archivoUrl = getArchivoUrlFromRow(r);
 
         const convId = MOV.idx.convenioId >= 0 ? (r[MOV.idx.convenioId] || "") : "";
         const convInfo = convId ? getConvenioInfo(String(convId).trim()) : null;
@@ -2731,7 +2759,7 @@ function renderResumenMensual() {
 
       document.getElementById("mvDescripcion").value = descripcion;
       document.getElementById("mvMonto").value = Math.abs(monto);
-      resetComprobanteInput(getCell(row, MOV.header, ["ArchivoURL","ArchivoUrl","Archivo URL","Archivo Url","archivoUrl","Comprobante","ComprobanteURL","ComprobanteUrl","Comprobante URL","URL Comprobante","Boleta","BoletaURL","Boleta URL"]));
+      resetComprobanteInput(getArchivoUrlFromRow(row));
 
       // Convenio: si la fila tiene Convenio_ID, activar modo convenio y cargar total
       const convId = (idx.convenioId >= 0 ? (row[idx.convenioId] || "") : "").toString().trim();
