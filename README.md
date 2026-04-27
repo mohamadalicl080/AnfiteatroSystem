@@ -115,7 +115,7 @@ Luego prueba eliminar desde la app.
 Si Apps Script muestra `version: "v11"` pero la app no elimina, revisa que Netlify esté usando el deploy nuevo y recarga la app con `Ctrl + F5`.
 
 
-## Actualización v12 - eliminación de comprobantes
+## Actualización v13 - eliminación de comprobantes
 
 Esta versión corrige la eliminación de comprobantes para que Netlify llame a Apps Script por POST JSON/text/plain.
 Si vienes de una versión anterior, reemplaza todo el código de Apps Script con `tools/apps-script-comprobantes.gs`, conserva tus valores `FOLDER_ID` y `SECRET`, guarda y publica una **New version**.
@@ -123,7 +123,12 @@ Si vienes de una versión anterior, reemplaza todo el código de Apps Script con
 Al probar `TU_URL_DE_APPS_SCRIPT/exec?secret=TU_SECRET`, debe aparecer:
 
 ```json
-"version": "v12",
+"version": "v13",
 "canDelete": true,
 "deleteMethod": "POST JSON/text/plain"
 ```
+
+
+## Nota v13
+
+La eliminación de comprobantes usa POST con parámetros en la URL para que Apps Script reciba `action=delete` de forma confiable. Después de reemplazar el código de `tools/apps-script-comprobantes.gs`, publica una **New version** del Web App.

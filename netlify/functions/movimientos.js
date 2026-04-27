@@ -155,7 +155,7 @@ function looksLikeOldAppsScriptWithoutDelete(msg) {
 }
 
 function deleteSupportMessage() {
-  return "Tu Apps Script publicado no tiene activa la eliminación por POST. Reemplaza TODO el código con tools/apps-script-comprobantes.gs de esta versión, guarda y publica una New version en Apps Script.";
+  return "Tu Apps Script publicado no está recibiendo action=delete por POST. Reemplaza TODO el código con tools/apps-script-comprobantes.gs de la versión v13, guarda y publica una New version en Apps Script.";
 }
 
 async function parseAppsScriptResponse(response, contextLabel) {
@@ -192,18 +192,14 @@ async function trashComprobanteByUrl(archivoUrl, { required = false } = {}) {
   }
 
   try {
-    // v12: borrado SOLO por POST JSON/text/plain, igual que la subida.
-    // No usa GET ni form-urlencoded porque Google puede responder HTML o porque
-    // Apps Script antiguo intenta parsear "secret=..." como JSON.
-    const response = await fetch(uploadUrl, {
+    // v13: borrado por POST con parametros en la URL.
+    // Esto evita que Apps Script confunda el cuerpo como subida de archivo.
+    // NO es GET: sigue llamando doPost(e), pero action/secret/fileId llegan en e.parameter.
+    const deleteUrl = `${uploadUrl}?secret=${encodeURIComponent(secret)}&action=delete&fileId=${encodeURIComponent(fileId)}&archivoUrl=${encodeURIComponent(clean)}`;
+    const response = await fetch(deleteUrl, {
       method: "POST",
       headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify({
-        secret,
-        action: "delete",
-        fileId,
-        archivoUrl: clean,
-      }),
+      body: "",
       redirect: "follow",
     });
 
