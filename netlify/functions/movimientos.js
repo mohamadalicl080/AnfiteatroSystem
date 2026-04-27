@@ -23,19 +23,6 @@ function safeJsonParse(body) {
   }
 }
 
-function looksLikeArchivoUrl(value) {
-  const clean = String(value || "").trim();
-  if (!/^https?:\/\//i.test(clean)) return false;
-  return clean.includes("drive.google.com")
-    || clean.includes("docs.google.com")
-    || /\.(png|jpe?g|gif|webp|bmp|svg|pdf|docx?|xlsx?|csv|txt)(\?|#|$)/i.test(clean);
-}
-
-function findArchivoUrlInRow(row = []) {
-  const found = (row || []).find(looksLikeArchivoUrl);
-  return String(found || "").trim();
-}
-
 // Alineado a A:AC (incluye columnas de convenio) (mismo orden que tu Sheet)
 function toRow(m) {
   return [
@@ -93,7 +80,7 @@ function rowToObj(r = []) {
     concepto: r[16] || "",
     periodo: r[17] || "",
     notas: r[18] || "",
-    archivoUrl: r[19] || findArchivoUrlInRow(r),
+    archivoUrl: r[19] || "",
     creadoEn: r[20] || "",
     creadoPorEmail: r[21] || "",
     actualizadoEn: r[22] || "",
@@ -114,122 +101,6 @@ async function getSheetIdByName(sheets, spreadsheetId, title) {
   if (!sheet) throw new Error(`No encontré la hoja "${title}" en el Spreadsheet`);
   return sheet.properties.sheetId;
 }
-
-function normalizeAppsScriptUrl(url) {
-  const clean = String(url || "").trim();
-  if (!clean) return "";
-  return clean.split("?")[0];
-}
-
-function extractDriveFileId(url) {
-  const clean = String(url || "").trim();
-  if (!clean) return "";
-
-  let match = clean.match(/\/file\/d\/([^/?#]+)/i);
-  if (match && match[1]) return decodeURIComponent(match[1]);
-
-  match = clean.match(/[?&]id=([^&#]+)/i);
-  if (match && match[1]) return decodeURIComponent(match[1]);
-
-  match = clean.match(/\/open\?id=([^&#]+)/i);
-  if (match && match[1]) return decodeURIComponent(match[1]);
-
-  if (/^[a-zA-Z0-9_-]{20,}$/.test(clean)) return clean;
-  return "";
-}
-
-function sameDriveFile(a, b) {
-  const idA = extractDriveFileId(a);
-  const idB = extractDriveFileId(b);
-  if (idA && idB) return idA === idB;
-  return String(a || "").trim() === String(b || "").trim();
-}
-
-function looksLikeOldAppsScriptWithoutDelete(msg) {
-  const t = String(msg || "").toLowerCase();
-  return t.includes("debes adjuntar un comprobante")
-    || t.includes("debes adjuntar un comprobante válido")
-    || t.includes("debes adjuntar un comprobante valido")
-    || t.includes("script function not found")
-    || t.includes("action delete no soportada")
-    || t.includes("no autorizado para subir comprobantes");
-}
-
-function deleteSupportMessage() {
-  return "El endpoint que Netlify está llamando no es el Apps Script v14 correcto o el secret no coincide. Revisa en Netlify que GOOGLE_APPS_SCRIPT_UPLOAD_URL sea la misma URL /exec que probaste, que COMPROBANTES_UPLOAD_SECRET sea exactamente igual al SECRET de Apps Script, y que ambas variables estén configuradas en el contexto Production. Luego publica una New version en Apps Script y redeploy en Netlify.";
-}
-
-async function parseAppsScriptResponse(response, contextLabel) {
-  const raw = await response.text();
-  let data = {};
-
-  try {
-    data = JSON.parse(raw || "{}");
-  } catch (parseErr) {
-    const e = new Error(`${contextLabel}: Apps Script respondió HTML/texto en vez de JSON. Esto casi siempre indica que la URL no es la /exec publicada, que el deployment no quedó público como "Anyone", o que Google devolvió una página de error. Respuesta: ${raw.slice(0, 220)}`);
-    e.statusCode = 502;
-    throw e;
-  }
-
-  return data;
-}
-
-async function trashComprobanteByUrl(archivoUrl, { required = false } = {}) {
-  const clean = String(archivoUrl || "").trim();
-  if (!clean) return { ok: true, skipped: true };
-
-  const uploadUrl = normalizeAppsScriptUrl(process.env.GOOGLE_APPS_SCRIPT_UPLOAD_URL);
-  const secret = String(process.env.COMPROBANTES_UPLOAD_SECRET || "").trim();
-  const fileId = extractDriveFileId(clean);
-
-  if (!uploadUrl || !secret) {
-    const msg = "Falta configurar GOOGLE_APPS_SCRIPT_UPLOAD_URL o COMPROBANTES_UPLOAD_SECRET para borrar comprobantes.";
-    if (required) {
-      const e = new Error(msg);
-      e.statusCode = 500;
-      throw e;
-    }
-    return { ok: false, warning: msg };
-  }
-
-  try {
-    // v14: enviamos el borrado como POST JSON/text/plain, igual que la subida.
-    // También repetimos action en la URL para máxima compatibilidad con Apps Script.
-    const deleteUrl = `${uploadUrl}?action=delete`;
-    const response = await fetch(deleteUrl, {
-      method: "POST",
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify({
-        secret,
-        action: "delete",
-        fileId,
-        archivoUrl: clean,
-      }),
-      redirect: "follow",
-    });
-
-    const data = await parseAppsScriptResponse(response, "Borrando comprobante");
-
-    if (!response.ok || data.ok === false) {
-      const msg = data.error || data.message || `Apps Script HTTP ${response.status}`;
-      const finalMsg = looksLikeOldAppsScriptWithoutDelete(msg) ? deleteSupportMessage() : msg;
-      const e = new Error(finalMsg);
-      e.statusCode = response.ok ? 400 : response.status;
-      throw e;
-    }
-
-    return data || { ok: true };
-  } catch (err) {
-    const finalMsg = err.message || String(err);
-    if (required) {
-      const e = new Error(`No pude borrar el comprobante adjunto: ${finalMsg}`);
-      e.statusCode = err.statusCode || 502;
-      throw e;
-    }
-    return { ok: false, warning: `No pude borrar el comprobante anterior: ${finalMsg}` };
-  }
-}
-
 
 exports.handler = async (event) => {
   try {
@@ -333,9 +204,6 @@ exports.handler = async (event) => {
         return withCors(json(403, { ok: false, error: "⛔ No autorizado." }));
       }
 
-      // Borra primero el comprobante asociado para no dejar archivos huérfanos en Drive.
-      const deleteArchivoResult = await trashComprobanteByUrl(existingObj.archivoUrl, { required: !!existingObj.archivoUrl });
-
       // En batchUpdate: indices 0-based y rows excluye header => +1
       const sheetRowIndex = rowIndexInRows + 1;
       const sheetId = await getSheetIdByName(sheets, spreadsheetId, SHEET_NAME);
@@ -356,11 +224,7 @@ exports.handler = async (event) => {
         },
       });
 
-      return withCors(json(200, {
-        ok: true,
-        deletedId: id,
-        comprobanteDeleted: !!deleteArchivoResult.deleted
-      }));
+      return withCors(json(200, { ok: true, deletedId: id }));
     }
 
     if (event.httpMethod === "PUT") {
@@ -412,10 +276,6 @@ exports.handler = async (event) => {
         }));
       }
 
-      const archivoUrlAnterior = String(existingObj.archivoUrl || "").trim();
-      const archivoUrlNuevo = String(payload.archivoUrl || "").trim();
-      const reemplazaArchivo = !!(archivoUrlAnterior && archivoUrlNuevo && !sameDriveFile(archivoUrlAnterior, archivoUrlNuevo));
-
       // Fila real en la hoja (A1 es header)
       const sheetRowNumber = rowIndexInRows + 2; // +1 header +1 por A1
       const updateRange = `${SHEET_NAME}!A${sheetRowNumber}:AC${sheetRowNumber}`;
@@ -428,13 +288,7 @@ exports.handler = async (event) => {
         requestBody: { values: [row] },
       });
 
-      let warning = "";
-      if (reemplazaArchivo) {
-        const trashResult = await trashComprobanteByUrl(archivoUrlAnterior, { required: false });
-        if (trashResult && trashResult.warning) warning = trashResult.warning;
-      }
-
-      return withCors(json(200, { ok: true, id, ...(warning ? { warning } : {}) }));
+      return withCors(json(200, { ok: true, id }));
     }
 
     return withCors(json(405, { ok: false, error: "Method not allowed" }));
