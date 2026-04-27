@@ -151,11 +151,12 @@ function looksLikeOldAppsScriptWithoutDelete(msg) {
     || t.includes("debes adjuntar un comprobante válido")
     || t.includes("debes adjuntar un comprobante valido")
     || t.includes("script function not found")
-    || t.includes("action delete no soportada");
+    || t.includes("action delete no soportada")
+    || t.includes("no autorizado para subir comprobantes");
 }
 
 function deleteSupportMessage() {
-  return "Tu Apps Script publicado no está recibiendo action=delete por POST. Reemplaza TODO el código con tools/apps-script-comprobantes.gs de la versión v13, guarda y publica una New version en Apps Script.";
+  return "El endpoint que Netlify está llamando no es el Apps Script v14 correcto o el secret no coincide. Revisa en Netlify que GOOGLE_APPS_SCRIPT_UPLOAD_URL sea la misma URL /exec que probaste, que COMPROBANTES_UPLOAD_SECRET sea exactamente igual al SECRET de Apps Script, y que ambas variables estén configuradas en el contexto Production. Luego publica una New version en Apps Script y redeploy en Netlify.";
 }
 
 async function parseAppsScriptResponse(response, contextLabel) {
@@ -192,14 +193,18 @@ async function trashComprobanteByUrl(archivoUrl, { required = false } = {}) {
   }
 
   try {
-    // v13: borrado por POST con parametros en la URL.
-    // Esto evita que Apps Script confunda el cuerpo como subida de archivo.
-    // NO es GET: sigue llamando doPost(e), pero action/secret/fileId llegan en e.parameter.
-    const deleteUrl = `${uploadUrl}?secret=${encodeURIComponent(secret)}&action=delete&fileId=${encodeURIComponent(fileId)}&archivoUrl=${encodeURIComponent(clean)}`;
+    // v14: enviamos el borrado como POST JSON/text/plain, igual que la subida.
+    // También repetimos action en la URL para máxima compatibilidad con Apps Script.
+    const deleteUrl = `${uploadUrl}?action=delete`;
     const response = await fetch(deleteUrl, {
       method: "POST",
       headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: "",
+      body: JSON.stringify({
+        secret,
+        action: "delete",
+        fileId,
+        archivoUrl: clean,
+      }),
       redirect: "follow",
     });
 

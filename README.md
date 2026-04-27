@@ -2,18 +2,21 @@
 
 App conectada a Google Sheets como base de datos de movimientos.
 
-## Cambio agregado
+## Funciones agregadas
 
 - Adjuntar comprobante / boleta al crear o editar un movimiento.
 - Límite máximo por archivo: 5 MB.
 - Formatos permitidos desde la app: imagen, PDF, Word, Excel, CSV o TXT.
+- El comprobante se muestra en el detalle/ticket del movimiento.
+- Si eliminas un movimiento, su comprobante se mueve a la papelera de Google Drive.
+- Si editas un movimiento y reemplazas el comprobante, el comprobante anterior se mueve a la papelera.
 - Se eliminó el uso visible de los campos Período Correspondiente y Estado de Pago en el formulario de movimiento.
 
 ## Importante para Gmail personal
 
 Si usas Google Drive personal, no uses Service Account para subir archivos a Drive. Google puede devolver `storageQuotaExceeded` aunque tu cuenta tenga espacio, porque el Service Account no tiene cuota de almacenamiento propia.
 
-La solución recomendada incluida en esta versión es subir los comprobantes mediante Google Apps Script, ejecutado como tu usuario Gmail personal.
+La solución incluida usa Google Apps Script, ejecutado como tu usuario Gmail personal.
 
 La conexión actual con Google Sheets queda igual y no debes cambiarla.
 
@@ -25,14 +28,14 @@ La conexión actual con Google Sheets queda igual y no debes cambiarla.
 - `AUTH_JWT_SECRET`
 - `API_KEY`, si la usas
 
-## Variables nuevas para comprobantes con Google Apps Script
+## Variables para comprobantes con Google Apps Script
 
-Agrega en Netlify:
+En Netlify deben existir:
 
 - `GOOGLE_APPS_SCRIPT_UPLOAD_URL`
 - `COMPROBANTES_UPLOAD_SECRET`
 
-`GOOGLE_DRIVE_FOLDER_ID` ya no es necesario si usas Apps Script, porque el ID de carpeta queda dentro del script de Google.
+`GOOGLE_DRIVE_FOLDER_ID` ya no es necesario para comprobantes si usas Apps Script, porque el ID de carpeta queda dentro del script de Google.
 
 ## Apps Script
 
@@ -40,29 +43,66 @@ El archivo listo para copiar está en:
 
 `tools/apps-script-comprobantes.gs`
 
-### Pasos rápidos
+### Pasos para actualizar Apps Script
 
-1. Crea una carpeta en tu Google Drive personal, por ejemplo `Comprobantes Anfiteatro`.
-2. Copia el ID de esa carpeta desde la URL.
-3. Entra a https://script.google.com/ y crea un proyecto nuevo.
-4. Pega el contenido de `tools/apps-script-comprobantes.gs`.
-5. Cambia `FOLDER_ID` por el ID de tu carpeta.
-6. Cambia `SECRET` por una clave larga inventada por ti.
-7. Clic en Deploy > New deployment.
-8. Tipo: Web app.
-9. Execute as: Me.
-10. Who has access: Anyone.
-11. Copia la URL que termina en `/exec`.
-12. En Netlify crea `GOOGLE_APPS_SCRIPT_UPLOAD_URL` con esa URL.
-13. En Netlify crea `COMPROBANTES_UPLOAD_SECRET` con la misma clave que pusiste en `SECRET`.
-14. Redespliega Netlify.
+1. Abre tu proyecto en https://script.google.com/.
+2. Reemplaza TODO el código por el contenido actualizado de `tools/apps-script-comprobantes.gs`.
+3. Mantén tus valores reales en estas líneas:
 
-## Prueba
+```javascript
+const FOLDER_ID = 'tu_id_real';
+const SECRET = 'tu_clave_real';
+```
 
-1. Crea un movimiento nuevo.
-2. Adjunta una imagen o PDF menor a 5 MB.
-3. Guarda.
-4. Revisa la carpeta de Drive: debe aparecer el comprobante.
+4. Guarda.
+5. Ve a **Deploy > Manage deployments**.
+6. Clic en el lápiz del deployment actual.
+7. En **Version**, selecciona **New version**.
+8. Clic en **Deploy**.
+9. No cambies la URL `/exec` en Netlify si sigue siendo la misma.
+10. Redespliega Netlify con el código nuevo.
+
+### Verificación
+
+Abre en el navegador:
+
+`TU_URL_DE_APPS_SCRIPT/exec?secret=TU_SECRET`
+
+Debe mostrar:
+
+```json
+"version": "v14",
+"canDelete": true,
+"deleteMethod": "POST JSON/text/plain, POST URL params o form-urlencoded"
+```
+
+## Netlify
+
+Después de subir esta versión:
+
+1. Entra a **Deploys**.
+2. Clic en **Trigger deploy**.
+3. Clic en **Deploy project**.
+4. Abre la app y recarga con `Ctrl + F5`.
+
+## Pruebas recomendadas
+
+1. Crea un movimiento nuevo con una imagen pequeña o PDF menor a 5 MB.
+2. Abre el detalle/ticket y confirma que se ve el comprobante.
+3. Edita el movimiento y reemplaza el comprobante.
+4. Revisa en Drive que el comprobante anterior quede en la papelera.
+5. Elimina el movimiento.
+6. Revisa en Drive que el comprobante del movimiento eliminado quede en la papelera.
+
+## Errores comunes
+
+Si aparece un error de autorización al borrar, revisa:
+
+- Que `COMPROBANTES_UPLOAD_SECRET` en Netlify sea exactamente igual al `SECRET` del Apps Script.
+- Que `GOOGLE_APPS_SCRIPT_UPLOAD_URL` sea la URL `/exec` correcta.
+- Que esas variables estén configuradas en el contexto **Production** de Netlify.
+- Que hayas publicado una **New version** del Apps Script después de pegar el código nuevo.
+- Que hayas hecho un nuevo deploy en Netlify.
 
 Si subes un archivo mayor a 5 MB, la app mostrará:
 
@@ -71,64 +111,3 @@ Si subes un archivo mayor a 5 MB, la app mostrará:
 Si Drive personal realmente está sin espacio, la app mostrará:
 
 `❌ Error guardando: Espacio lleno en Google Drive. Libera espacio o actualiza tu plan de almacenamiento.`
-
-## Limpieza automática de comprobantes
-
-Esta versión también limpia archivos para no ocupar espacio innecesario en Drive:
-
-- Si eliminas un movimiento desde la app, primero se mueve su comprobante a la papelera de Google Drive y luego se elimina la fila del movimiento.
-- Si editas un movimiento y reemplazas el comprobante, el archivo anterior se mueve a la papelera después de guardar el cambio.
-
-Para activar esta parte debes actualizar el Apps Script con el archivo nuevo `tools/apps-script-comprobantes.gs` y publicar una **New version** del deployment web app.
-
-Esta versión v11 elimina usando **POST form-urlencoded**, que Apps Script recibe en `e.parameter`. Esto evita el problema anterior donde la app caía a GET y Google devolvía una página HTML en vez de JSON.
-
-Pasos al actualizar Apps Script:
-
-1. Abre tu proyecto en https://script.google.com/.
-2. Reemplaza **todo** el código por el contenido actualizado de `tools/apps-script-comprobantes.gs`.
-3. Mantén tus valores reales de `FOLDER_ID` y `SECRET`.
-4. Guarda.
-5. Ve a Deploy > Manage deployments.
-6. Clic en el lápiz.
-7. En Version elige **New version**.
-8. Clic en Deploy.
-9. No cambies la URL `/exec` en Netlify si sigue siendo la misma.
-10. Redespliega Netlify con el código nuevo.
-
-## Verificación de Apps Script v11
-
-Abre en el navegador:
-
-`TU_URL_DE_APPS_SCRIPT/exec?secret=TU_SECRET`
-
-Debe mostrar:
-
-- `canDelete: true`
-- `deleteMethod: "POST form-urlencoded"`
-- `version: "v11"`
-
-Luego prueba eliminar desde la app.
-
-## Si no elimina
-
-Si Apps Script muestra `version: "v11"` pero la app no elimina, revisa que Netlify esté usando el deploy nuevo y recarga la app con `Ctrl + F5`.
-
-
-## Actualización v13 - eliminación de comprobantes
-
-Esta versión corrige la eliminación de comprobantes para que Netlify llame a Apps Script por POST JSON/text/plain.
-Si vienes de una versión anterior, reemplaza todo el código de Apps Script con `tools/apps-script-comprobantes.gs`, conserva tus valores `FOLDER_ID` y `SECRET`, guarda y publica una **New version**.
-
-Al probar `TU_URL_DE_APPS_SCRIPT/exec?secret=TU_SECRET`, debe aparecer:
-
-```json
-"version": "v13",
-"canDelete": true,
-"deleteMethod": "POST JSON/text/plain"
-```
-
-
-## Nota v13
-
-La eliminación de comprobantes usa POST con parámetros en la URL para que Apps Script reciba `action=delete` de forma confiable. Después de reemplazar el código de `tools/apps-script-comprobantes.gs`, publica una **New version** del Web App.
