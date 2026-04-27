@@ -11,8 +11,8 @@
  * 5) Copia la URL /exec y ponla en Netlify como GOOGLE_APPS_SCRIPT_UPLOAD_URL.
  * 6) Pon la misma clave SECRET en Netlify como COMPROBANTES_UPLOAD_SECRET.
  *
- * Esta versión también permite enviar action: "delete" para mover a la papelera
- * el comprobante cuando se borra un movimiento o se reemplaza su adjunto.
+ * Esta versión también permite enviar action: "delete" por GET o POST para mover a
+ * la papelera el comprobante cuando se borra un movimiento o se reemplaza su adjunto.
  */
 
 const FOLDER_ID = 'PEGA_AQUI_EL_ID_DE_TU_CARPETA_DRIVE';
@@ -150,13 +150,21 @@ function doPost(e) {
 
 function doGet(e) {
   try {
-    const secret = e && e.parameter && e.parameter.secret;
+    const params = (e && e.parameter) || {};
+    const secret = params.secret;
 
     if (SECRET && secret !== SECRET) {
       return json_({
         ok: false,
         error: 'No autorizado. Secret incorrecto.'
       });
+    }
+
+    const action = String(params.action || 'test').toLowerCase().trim();
+
+    if (action === 'delete' || action === 'trash') {
+      const result = trashFile_(params.fileId || params.archivoUrl || params.url || params.fileUrl);
+      return json_(result);
     }
 
     const folder = DriveApp.getFolderById(FOLDER_ID);
@@ -187,6 +195,7 @@ function doGet(e) {
       canUpload: true,
       canDelete: true,
       actions: ['upload', 'delete'],
+      deleteMethod: 'GET',
       storageLimit: storageLimit,
       storageUsed: storageUsed,
       testFileCreated: true,

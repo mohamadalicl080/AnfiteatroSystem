@@ -149,11 +149,13 @@ function looksLikeOldAppsScriptWithoutDelete(msg) {
   const t = String(msg || "").toLowerCase();
   return t.includes("debes adjuntar un comprobante")
     || t.includes("debes adjuntar un comprobante válido")
-    || t.includes("debes adjuntar un comprobante valido");
+    || t.includes("debes adjuntar un comprobante valido")
+    || t.includes("script function not found")
+    || t.includes("action delete no soportada");
 }
 
 function deleteSupportMessage() {
-  return "Tu Apps Script publicado todavía es la versión anterior y no tiene la función para borrar comprobantes. Reemplaza el código con tools/apps-script-comprobantes.gs y publica una New version en Apps Script.";
+  return "Tu Apps Script publicado no tiene activa la función GET action=delete. Reemplaza el código con tools/apps-script-comprobantes.gs de la versión v9 y publica una New version en Apps Script.";
 }
 
 async function trashComprobanteByUrl(archivoUrl, { required = false } = {}) {
@@ -173,15 +175,14 @@ async function trashComprobanteByUrl(archivoUrl, { required = false } = {}) {
     return { ok: false, warning: msg };
   }
 
-  const response = await fetch(uploadUrl, {
-    method: "POST",
-    headers: { "Content-Type": "text/plain;charset=utf-8" },
-    body: JSON.stringify({
-      secret,
-      action: "delete",
-      archivoUrl: clean,
-      fileId: extractDriveFileId(clean),
-    }),
+  const deleteUrl = new URL(uploadUrl);
+  deleteUrl.searchParams.set("secret", secret);
+  deleteUrl.searchParams.set("action", "delete");
+  deleteUrl.searchParams.set("fileId", extractDriveFileId(clean));
+  deleteUrl.searchParams.set("archivoUrl", clean);
+
+  const response = await fetch(deleteUrl.toString(), {
+    method: "GET",
   });
 
   const raw = await response.text();

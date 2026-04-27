@@ -79,7 +79,7 @@ Esta versión también limpia archivos para no ocupar espacio innecesario en Dri
 - Si eliminas un movimiento desde la app, primero se mueve su comprobante a la papelera de Google Drive y luego se elimina la fila del movimiento.
 - Si editas un movimiento y reemplazas el comprobante, el archivo anterior se mueve a la papelera después de guardar el cambio.
 
-Para activar esta parte debes actualizar el Apps Script con el archivo nuevo `tools/apps-script-comprobantes.gs` y publicar una **New version** del deployment web app. Si no actualizas el Apps Script, la subida puede seguir funcionando, pero la eliminación automática del archivo no.
+Para activar esta parte debes actualizar el Apps Script con el archivo nuevo `tools/apps-script-comprobantes.gs` y publicar una **New version** del deployment web app. Esta versión v9 borra mediante `GET action=delete`, para evitar el problema donde el script sí mostraba `canDelete: true` en la prueba, pero la app seguía llamando a la ruta antigua.
 
 Pasos al actualizar Apps Script:
 
@@ -93,3 +93,17 @@ Pasos al actualizar Apps Script:
 8. Clic en Deploy.
 9. No cambies la URL `/exec` en Netlify si sigue siendo la misma.
 10. Redespliega Netlify con el código nuevo.
+
+
+## Verificación de borrado v9
+
+Abre en el navegador:
+
+`TU_URL_DE_APPS_SCRIPT/exec?secret=TU_SECRET`
+
+Debe mostrar:
+
+- `canDelete: true`
+- `deleteMethod: "GET"`
+
+Luego prueba eliminar desde la app.
