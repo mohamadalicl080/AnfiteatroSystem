@@ -79,12 +79,14 @@ Esta versión también limpia archivos para no ocupar espacio innecesario en Dri
 - Si eliminas un movimiento desde la app, primero se mueve su comprobante a la papelera de Google Drive y luego se elimina la fila del movimiento.
 - Si editas un movimiento y reemplazas el comprobante, el archivo anterior se mueve a la papelera después de guardar el cambio.
 
-Para activar esta parte debes actualizar el Apps Script con el archivo nuevo `tools/apps-script-comprobantes.gs` y publicar una **New version** del deployment web app. Esta versión v9 borra mediante `GET action=delete`, para evitar el problema donde el script sí mostraba `canDelete: true` en la prueba, pero la app seguía llamando a la ruta antigua.
+Para activar esta parte debes actualizar el Apps Script con el archivo nuevo `tools/apps-script-comprobantes.gs` y publicar una **New version** del deployment web app.
+
+Esta versión v11 elimina usando **POST form-urlencoded**, que Apps Script recibe en `e.parameter`. Esto evita el problema anterior donde la app caía a GET y Google devolvía una página HTML en vez de JSON.
 
 Pasos al actualizar Apps Script:
 
 1. Abre tu proyecto en https://script.google.com/.
-2. Reemplaza todo el código por el contenido actualizado de `tools/apps-script-comprobantes.gs`.
+2. Reemplaza **todo** el código por el contenido actualizado de `tools/apps-script-comprobantes.gs`.
 3. Mantén tus valores reales de `FOLDER_ID` y `SECRET`.
 4. Guarda.
 5. Ve a Deploy > Manage deployments.
@@ -94,8 +96,7 @@ Pasos al actualizar Apps Script:
 9. No cambies la URL `/exec` en Netlify si sigue siendo la misma.
 10. Redespliega Netlify con el código nuevo.
 
-
-## Verificación de borrado v9
+## Verificación de Apps Script v11
 
 Abre en el navegador:
 
@@ -104,11 +105,11 @@ Abre en el navegador:
 Debe mostrar:
 
 - `canDelete: true`
-- `deleteMethod: "GET"`
+- `deleteMethod: "POST form-urlencoded"`
+- `version: "v11"`
 
 Luego prueba eliminar desde la app.
 
+## Si no elimina
 
-## Nota v10
-
-Esta versión corrige el borrado de comprobantes usando POST hacia Apps Script, igual que la subida. Mantiene GET como respaldo.
+Si Apps Script muestra `version: "v11"` pero la app no elimina, revisa que Netlify esté usando el deploy nuevo y recarga la app con `Ctrl + F5`.

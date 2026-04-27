@@ -155,7 +155,7 @@ function looksLikeOldAppsScriptWithoutDelete(msg) {
 }
 
 function deleteSupportMessage() {
-  return "Tu Apps Script publicado no tiene activa la función GET action=delete. Reemplaza el código con tools/apps-script-comprobantes.gs de la versión v10 y publica una New version en Apps Script.";
+  return "Tu Apps Script publicado no tiene activa la eliminación por POST. Reemplaza TODO el código con tools/apps-script-comprobantes.gs de esta versión, guarda y publica una New version en Apps Script.";
 }
 
 async function parseAppsScriptResponse(response, contextLabel) {
@@ -165,7 +165,7 @@ async function parseAppsScriptResponse(response, contextLabel) {
   try {
     data = JSON.parse(raw || "{}");
   } catch (parseErr) {
-    const e = new Error(`${contextLabel}: Apps Script respondió HTML/texto en vez de JSON. Revisa que la Web App esté publicada como "Execute as: Me" y "Who has access: Anyone", y que la URL sea la /exec. Respuesta: ${raw.slice(0, 220)}`);
+    const e = new Error(`${contextLabel}: Apps Script respondió HTML/texto en vez de JSON. Esto casi siempre indica que la URL no es la /exec publicada, que el deployment no quedó público como "Anyone", o que Google devolvió una página de error. Respuesta: ${raw.slice(0, 220)}`);
     e.statusCode = 502;
     throw e;
   }
@@ -191,67 +191,42 @@ async function trashComprobanteByUrl(archivoUrl, { required = false } = {}) {
     return { ok: false, warning: msg };
   }
 
-  const body = {
-    secret,
-    action: "delete",
-    fileId,
-    archivoUrl: clean,
-  };
+  const params = new URLSearchParams();
+  params.set("secret", secret);
+  params.set("action", "delete");
+  if (fileId) params.set("fileId", fileId);
+  params.set("archivoUrl", clean);
 
-  let data;
   try {
-    // Borrado principal: POST, igual que la subida. Evita errores HTML que a veces da Apps Script con GET desde Netlify.
+    // Borrado por POST x-www-form-urlencoded. Apps Script lo recibe en e.parameter,
+    // que es más confiable para acciones pequeñas que parsear JSON manualmente.
     const response = await fetch(uploadUrl, {
       method: "POST",
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify(body),
+      headers: { "Content-Type": "application/x-www-form-urlencoded;charset=utf-8" },
+      body: params.toString(),
       redirect: "follow",
     });
 
-    data = await parseAppsScriptResponse(response, "Borrando comprobante");
+    const data = await parseAppsScriptResponse(response, "Borrando comprobante");
 
     if (!response.ok || data.ok === false) {
-      const msg = data.error || `Apps Script HTTP ${response.status}`;
+      const msg = data.error || data.message || `Apps Script HTTP ${response.status}`;
       const finalMsg = looksLikeOldAppsScriptWithoutDelete(msg) ? deleteSupportMessage() : msg;
       const e = new Error(finalMsg);
       e.statusCode = response.ok ? 400 : response.status;
       throw e;
     }
-  } catch (postErr) {
-    // Fallback GET solo para casos donde el POST sea bloqueado por una configuración rara.
-    try {
-      const deleteUrl = new URL(uploadUrl);
-      deleteUrl.searchParams.set("secret", secret);
-      deleteUrl.searchParams.set("action", "delete");
-      if (fileId) deleteUrl.searchParams.set("fileId", fileId);
-      deleteUrl.searchParams.set("archivoUrl", clean);
 
-      const response = await fetch(deleteUrl.toString(), {
-        method: "GET",
-        redirect: "follow",
-      });
-
-      data = await parseAppsScriptResponse(response, "Borrando comprobante por GET");
-
-      if (!response.ok || data.ok === false) {
-        const msg = data.error || `Apps Script HTTP ${response.status}`;
-        const finalMsg = looksLikeOldAppsScriptWithoutDelete(msg) ? deleteSupportMessage() : msg;
-        const e = new Error(finalMsg);
-        e.statusCode = response.ok ? 400 : response.status;
-        throw e;
-      }
-    } catch (getErr) {
-      const finalMsg = getErr.message || postErr.message || String(getErr || postErr);
-      if (required) {
-        const e = new Error(`No pude borrar el comprobante adjunto: ${finalMsg}`);
-        e.statusCode = getErr.statusCode || postErr.statusCode || 502;
-        throw e;
-      }
-      return { ok: false, warning: `No pude borrar el comprobante anterior: ${finalMsg}` };
+    return data || { ok: true };
+  } catch (err) {
+    const finalMsg = err.message || String(err);
+    if (required) {
+      const e = new Error(`No pude borrar el comprobante adjunto: ${finalMsg}`);
+      e.statusCode = err.statusCode || 502;
+      throw e;
     }
+    return { ok: false, warning: `No pude borrar el comprobante anterior: ${finalMsg}` };
   }
-
-  return data || { ok: true };
 }
 
 

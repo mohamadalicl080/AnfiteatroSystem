@@ -1,5 +1,5 @@
 /**
- * Apps Script para subir comprobantes/boletas a Google Drive personal.
+ * Apps Script para subir, mostrar y eliminar comprobantes/boletas en Google Drive personal.
  *
  * Pasos:
  * 1) Crea una carpeta en Google Drive.
@@ -11,8 +11,10 @@
  * 5) Copia la URL /exec y ponla en Netlify como GOOGLE_APPS_SCRIPT_UPLOAD_URL.
  * 6) Pon la misma clave SECRET en Netlify como COMPROBANTES_UPLOAD_SECRET.
  *
- * Esta versión también permite enviar action: "delete" por GET o POST para mover a
- * la papelera el comprobante cuando se borra un movimiento o se reemplaza su adjunto.
+ * Versión v11:
+ * - Sube archivos por POST con JSON/base64.
+ * - Elimina archivos por POST usando application/x-www-form-urlencoded o JSON.
+ * - doGet solo sirve para diagnóstico.
  */
 
 const FOLDER_ID = 'PEGA_AQUI_EL_ID_DE_TU_CARPETA_DRIVE';
@@ -34,6 +36,30 @@ function safeName_(name) {
     .slice(0, 160) || 'comprobante';
 }
 
+function readBody_(e) {
+  const params = (e && e.parameter) || {};
+  let body = {};
+
+  if (e && e.postData && e.postData.contents) {
+    const raw = String(e.postData.contents || '').trim();
+
+    if (raw) {
+      try {
+        body = JSON.parse(raw);
+      } catch (jsonErr) {
+        // Si llega como x-www-form-urlencoded, Apps Script lo deja en e.parameter.
+        body = {};
+      }
+    }
+  }
+
+  // e.parameter manda sobre body para soportar POST form-urlencoded.
+  const merged = {};
+  Object.keys(body || {}).forEach(function(k) { merged[k] = body[k]; });
+  Object.keys(params || {}).forEach(function(k) { merged[k] = params[k]; });
+  return merged;
+}
+
 function extractFileId_(value) {
   const clean = String(value || '').trim();
   if (!clean) return '';
@@ -47,7 +73,6 @@ function extractFileId_(value) {
   match = clean.match(/\/open\?id=([^&#]+)/i);
   if (match && match[1]) return decodeURIComponent(match[1]);
 
-  // Permite recibir el ID directo desde Netlify.
   if (/^[a-zA-Z0-9_-]{20,}$/.test(clean)) return clean;
 
   return '';
@@ -55,15 +80,18 @@ function extractFileId_(value) {
 
 function fileBelongsToFolder_(file, folderId) {
   const parents = file.getParents();
+
   while (parents.hasNext()) {
     const parent = parents.next();
     if (parent.getId() === folderId) return true;
   }
+
   return false;
 }
 
 function trashFile_(fileIdOrUrl) {
   const fileId = extractFileId_(fileIdOrUrl);
+
   if (!fileId) {
     return {
       ok: true,
@@ -75,7 +103,6 @@ function trashFile_(fileIdOrUrl) {
 
   const file = DriveApp.getFileById(fileId);
 
-  // Seguridad: evita borrar archivos que no estén en la carpeta de comprobantes.
   if (!fileBelongsToFolder_(file, FOLDER_ID)) {
     return {
       ok: false,
@@ -93,58 +120,85 @@ function trashFile_(fileIdOrUrl) {
   };
 }
 
+function uploadFile_(body) {
+  const rawBase64 = String(body.base64 || '');
+
+  if (!rawBase64) {
+    return json_({
+      ok: false,
+      error: 'Debes adjuntar un comprobante válido.'
+    });
+  }
+
+  const bytes = Utilities.base64Decode(rawBase64);
+
+  if (bytes.length > MAX_BYTES) {
+    return json_({
+      ok: false,
+      error: 'El comprobante supera 5 MB. Comprime el archivo o usa uno más liviano.'
+    });
+  }
+
+  const folder = DriveApp.getFolderById(FOLDER_ID);
+  const fileName = safeName_(body.fileName || 'comprobante');
+  const mimeType = String(body.mimeType || 'application/octet-stream');
+  const blob = Utilities.newBlob(bytes, mimeType, fileName);
+  const file = folder.createFile(blob);
+
+  if (SHARE_ANYONE_WITH_LINK) {
+    try {
+      file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    } catch (shareErr) {
+      // Si tu cuenta no permite enlaces públicos, el archivo igual queda guardado.
+    }
+  }
+
+  return json_({
+    ok: true,
+    fileId: file.getId(),
+    name: file.getName(),
+    archivoUrl: file.getUrl()
+  });
+}
+
 function doPost(e) {
   try {
-    const body = JSON.parse((e && e.postData && e.postData.contents) || '{}');
+    const body = readBody_(e);
 
     if (SECRET && body.secret !== SECRET) {
-      return json_({ ok: false, error: 'No autorizado para subir comprobantes.' });
+      return json_({
+        ok: false,
+        error: 'No autorizado para subir o borrar comprobantes.'
+      });
     }
 
     const action = String(body.action || 'upload').toLowerCase().trim();
 
     if (action === 'delete' || action === 'trash') {
-      const result = trashFile_(body.fileId || body.archivoUrl || body.url || body.fileUrl);
-      return json_(result);
+      return json_(trashFile_(body.fileId || body.archivoUrl || body.url || body.fileUrl));
     }
 
-    const rawBase64 = String(body.base64 || '');
-    if (!rawBase64) {
-      return json_({ ok: false, error: 'Debes adjuntar un comprobante válido.' });
-    }
+    return uploadFile_(body);
 
-    const bytes = Utilities.base64Decode(rawBase64);
-    if (bytes.length > MAX_BYTES) {
-      return json_({ ok: false, error: 'El comprobante supera 5 MB. Comprime el archivo o usa uno más liviano.' });
-    }
-
-    const folder = DriveApp.getFolderById(FOLDER_ID);
-    const fileName = safeName_(body.fileName || 'comprobante');
-    const mimeType = String(body.mimeType || 'application/octet-stream');
-    const blob = Utilities.newBlob(bytes, mimeType, fileName);
-    const file = folder.createFile(blob);
-
-    if (SHARE_ANYONE_WITH_LINK) {
-      try {
-        file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-      } catch (shareErr) {
-        // Si tu cuenta no permite enlaces públicos, el archivo igual queda guardado.
-      }
-    }
-
-    return json_({
-      ok: true,
-      fileId: file.getId(),
-      name: file.getName(),
-      archivoUrl: file.getUrl()
-    });
   } catch (err) {
     const msg = String(err && err.message ? err.message : err);
     const lower = msg.toLowerCase();
-    if (lower.includes('storage') || lower.includes('quota') || lower.includes('espacio')) {
-      return json_({ ok: false, error: 'Espacio lleno en Google Drive. Libera espacio o actualiza tu plan de almacenamiento.' });
+
+    if (
+      lower.includes('storage') ||
+      lower.includes('quota') ||
+      lower.includes('espacio')
+    ) {
+      return json_({
+        ok: false,
+        error: 'Espacio lleno en Google Drive. Libera espacio o actualiza tu plan de almacenamiento.'
+      });
     }
-    return json_({ ok: false, error: msg });
+
+    return json_({
+      ok: false,
+      error: msg
+    });
   }
 }
 
@@ -163,8 +217,7 @@ function doGet(e) {
     const action = String(params.action || 'test').toLowerCase().trim();
 
     if (action === 'delete' || action === 'trash') {
-      const result = trashFile_(params.fileId || params.archivoUrl || params.url || params.fileUrl);
-      return json_(result);
+      return json_(trashFile_(params.fileId || params.archivoUrl || params.url || params.fileUrl));
     }
 
     const folder = DriveApp.getFolderById(FOLDER_ID);
@@ -185,20 +238,21 @@ function doGet(e) {
 
     const testFile = folder.createFile(testBlob);
     const testUrl = testFile.getUrl();
-
     testFile.setTrashed(true);
 
     return json_({
       ok: true,
-      message: 'Apps Script puede crear archivos en esta carpeta y tiene activada la función para eliminar comprobantes.',
+      message: 'Apps Script puede crear archivos y tiene activa la eliminación por POST.',
       folderName: folder.getName(),
       canUpload: true,
       canDelete: true,
       actions: ['upload', 'delete'],
-      deleteMethod: 'GET',
+      deleteMethod: 'POST form-urlencoded',
+      version: 'v11',
       storageLimit: storageLimit,
       storageUsed: storageUsed,
       testFileCreated: true,
+      testFileDeleted: true,
       testFileUrl: testUrl
     });
 
