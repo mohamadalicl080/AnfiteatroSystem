@@ -1960,7 +1960,7 @@
             method: "PUT",
             body: JSON.stringify(payload)
           });
-          alert(`✅ Movimiento editado!\nID: ${result.id || EDITING_ID}`);
+          alert(`✅ Movimiento editado!\nID: ${result.id || EDITING_ID}${result.warning ? "\n⚠️ " + result.warning : ""}`);
           logAction("Editar", `${payload.area} · ${payload.tipo} · ${formatCLP(payload.monto)} · ${payload.descripcion}`, EDITING_ID);
         } else {
           const result = await apiFetch("/.netlify/functions/movimientos", {
@@ -2799,8 +2799,8 @@ function renderResumenMensual() {
       if (!id) return;
       if (!confirm(`¿Eliminar movimiento?\nID: ${id}`)) return;
       try {
-        await apiFetch(`/.netlify/functions/movimientos?id=${encodeURIComponent(id)}`, { method: "DELETE" });
-        alert("✅ Eliminado: " + id);
+        const result = await apiFetch(`/.netlify/functions/movimientos?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+        alert("✅ Eliminado: " + id + (result.comprobanteDeleted ? "\n🧹 Comprobante eliminado de Drive." : ""));
         logAction("Eliminar", `ID: ${id}`, id);
         await loadMovimientos();
       } catch (e) {

@@ -71,3 +71,25 @@ Si subes un archivo mayor a 5 MB, la app mostrará:
 Si Drive personal realmente está sin espacio, la app mostrará:
 
 `❌ Error guardando: Espacio lleno en Google Drive. Libera espacio o actualiza tu plan de almacenamiento.`
+
+## Limpieza automática de comprobantes
+
+Esta versión también limpia archivos para no ocupar espacio innecesario en Drive:
+
+- Si eliminas un movimiento desde la app, primero se mueve su comprobante a la papelera de Google Drive y luego se elimina la fila del movimiento.
+- Si editas un movimiento y reemplazas el comprobante, el archivo anterior se mueve a la papelera después de guardar el cambio.
+
+Para activar esta parte debes actualizar el Apps Script con el archivo nuevo `tools/apps-script-comprobantes.gs` y publicar una **New version** del deployment web app. Si no actualizas el Apps Script, la subida puede seguir funcionando, pero la eliminación automática del archivo no.
+
+Pasos al actualizar Apps Script:
+
+1. Abre tu proyecto en https://script.google.com/.
+2. Reemplaza todo el código por el contenido actualizado de `tools/apps-script-comprobantes.gs`.
+3. Mantén tus valores reales de `FOLDER_ID` y `SECRET`.
+4. Guarda.
+5. Ve a Deploy > Manage deployments.
+6. Clic en el lápiz.
+7. En Version elige **New version**.
+8. Clic en Deploy.
+9. No cambies la URL `/exec` en Netlify si sigue siendo la misma.
+10. Redespliega Netlify con el código nuevo.

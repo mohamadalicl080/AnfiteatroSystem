@@ -23,6 +23,19 @@ function safeJsonParse(body) {
   }
 }
 
+function looksLikeArchivoUrl(value) {
+  const clean = String(value || "").trim();
+  if (!/^https?:\/\//i.test(clean)) return false;
+  return clean.includes("drive.google.com")
+    || clean.includes("docs.google.com")
+    || /\.(png|jpe?g|gif|webp|bmp|svg|pdf|docx?|xlsx?|csv|txt)(\?|#|$)/i.test(clean);
+}
+
+function findArchivoUrlInRow(row = []) {
+  const found = (row || []).find(looksLikeArchivoUrl);
+  return String(found || "").trim();
+}
+
 // Alineado a A:AC (incluye columnas de convenio) (mismo orden que tu Sheet)
 function toRow(m) {
   return [
@@ -80,7 +93,7 @@ function rowToObj(r = []) {
     concepto: r[16] || "",
     periodo: r[17] || "",
     notas: r[18] || "",
-    archivoUrl: r[19] || "",
+    archivoUrl: r[19] || findArchivoUrlInRow(r),
     creadoEn: r[20] || "",
     creadoPorEmail: r[21] || "",
     actualizadoEn: r[22] || "",
@@ -101,6 +114,92 @@ async function getSheetIdByName(sheets, spreadsheetId, title) {
   if (!sheet) throw new Error(`No encontré la hoja "${title}" en el Spreadsheet`);
   return sheet.properties.sheetId;
 }
+
+function normalizeAppsScriptUrl(url) {
+  const clean = String(url || "").trim();
+  if (!clean) return "";
+  return clean.split("?")[0];
+}
+
+function extractDriveFileId(url) {
+  const clean = String(url || "").trim();
+  if (!clean) return "";
+
+  let match = clean.match(/\/file\/d\/([^/?#]+)/i);
+  if (match && match[1]) return decodeURIComponent(match[1]);
+
+  match = clean.match(/[?&]id=([^&#]+)/i);
+  if (match && match[1]) return decodeURIComponent(match[1]);
+
+  match = clean.match(/\/open\?id=([^&#]+)/i);
+  if (match && match[1]) return decodeURIComponent(match[1]);
+
+  if (/^[a-zA-Z0-9_-]{20,}$/.test(clean)) return clean;
+  return "";
+}
+
+function sameDriveFile(a, b) {
+  const idA = extractDriveFileId(a);
+  const idB = extractDriveFileId(b);
+  if (idA && idB) return idA === idB;
+  return String(a || "").trim() === String(b || "").trim();
+}
+
+async function trashComprobanteByUrl(archivoUrl, { required = false } = {}) {
+  const clean = String(archivoUrl || "").trim();
+  if (!clean) return { ok: true, skipped: true };
+
+  const uploadUrl = normalizeAppsScriptUrl(process.env.GOOGLE_APPS_SCRIPT_UPLOAD_URL);
+  const secret = String(process.env.COMPROBANTES_UPLOAD_SECRET || "").trim();
+
+  if (!uploadUrl || !secret) {
+    const msg = "Falta configurar GOOGLE_APPS_SCRIPT_UPLOAD_URL o COMPROBANTES_UPLOAD_SECRET para borrar comprobantes.";
+    if (required) {
+      const e = new Error(msg);
+      e.statusCode = 500;
+      throw e;
+    }
+    return { ok: false, warning: msg };
+  }
+
+  const response = await fetch(uploadUrl, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify({
+      secret,
+      action: "delete",
+      archivoUrl: clean,
+      fileId: extractDriveFileId(clean),
+    }),
+  });
+
+  const raw = await response.text();
+  let data = {};
+  try {
+    data = JSON.parse(raw || "{}");
+  } catch (parseErr) {
+    const msg = `Apps Script respondió algo inválido al borrar comprobante: ${raw.slice(0, 250)}`;
+    if (required) {
+      const e = new Error(msg);
+      e.statusCode = 502;
+      throw e;
+    }
+    return { ok: false, warning: msg };
+  }
+
+  if (!response.ok || data.ok === false) {
+    const msg = data.error || `Apps Script HTTP ${response.status}`;
+    if (required) {
+      const e = new Error(`No pude borrar el comprobante adjunto: ${msg}`);
+      e.statusCode = response.ok ? 400 : response.status;
+      throw e;
+    }
+    return { ok: false, warning: `No pude borrar el comprobante anterior: ${msg}` };
+  }
+
+  return data;
+}
+
 
 exports.handler = async (event) => {
   try {
@@ -204,6 +303,9 @@ exports.handler = async (event) => {
         return withCors(json(403, { ok: false, error: "⛔ No autorizado." }));
       }
 
+      // Borra primero el comprobante asociado para no dejar archivos huérfanos en Drive.
+      const deleteArchivoResult = await trashComprobanteByUrl(existingObj.archivoUrl, { required: !!existingObj.archivoUrl });
+
       // En batchUpdate: indices 0-based y rows excluye header => +1
       const sheetRowIndex = rowIndexInRows + 1;
       const sheetId = await getSheetIdByName(sheets, spreadsheetId, SHEET_NAME);
@@ -224,7 +326,11 @@ exports.handler = async (event) => {
         },
       });
 
-      return withCors(json(200, { ok: true, deletedId: id }));
+      return withCors(json(200, {
+        ok: true,
+        deletedId: id,
+        comprobanteDeleted: !!deleteArchivoResult.deleted
+      }));
     }
 
     if (event.httpMethod === "PUT") {
@@ -276,6 +382,10 @@ exports.handler = async (event) => {
         }));
       }
 
+      const archivoUrlAnterior = String(existingObj.archivoUrl || "").trim();
+      const archivoUrlNuevo = String(payload.archivoUrl || "").trim();
+      const reemplazaArchivo = !!(archivoUrlAnterior && archivoUrlNuevo && !sameDriveFile(archivoUrlAnterior, archivoUrlNuevo));
+
       // Fila real en la hoja (A1 es header)
       const sheetRowNumber = rowIndexInRows + 2; // +1 header +1 por A1
       const updateRange = `${SHEET_NAME}!A${sheetRowNumber}:AC${sheetRowNumber}`;
@@ -288,7 +398,13 @@ exports.handler = async (event) => {
         requestBody: { values: [row] },
       });
 
-      return withCors(json(200, { ok: true, id }));
+      let warning = "";
+      if (reemplazaArchivo) {
+        const trashResult = await trashComprobanteByUrl(archivoUrlAnterior, { required: false });
+        if (trashResult && trashResult.warning) warning = trashResult.warning;
+      }
+
+      return withCors(json(200, { ok: true, id, ...(warning ? { warning } : {}) }));
     }
 
     return withCors(json(405, { ok: false, error: "Method not allowed" }));
