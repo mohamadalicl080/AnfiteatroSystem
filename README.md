@@ -107,3 +107,8 @@ Debe mostrar:
 - `deleteMethod: "GET"`
 
 Luego prueba eliminar desde la app.
+
+
+## Nota v10
+
+Esta versión corrige el borrado de comprobantes usando POST hacia Apps Script, igual que la subida. Mantiene GET como respaldo.

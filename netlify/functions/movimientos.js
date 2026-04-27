@@ -155,7 +155,22 @@ function looksLikeOldAppsScriptWithoutDelete(msg) {
 }
 
 function deleteSupportMessage() {
-  return "Tu Apps Script publicado no tiene activa la función GET action=delete. Reemplaza el código con tools/apps-script-comprobantes.gs de la versión v9 y publica una New version en Apps Script.";
+  return "Tu Apps Script publicado no tiene activa la función GET action=delete. Reemplaza el código con tools/apps-script-comprobantes.gs de la versión v10 y publica una New version en Apps Script.";
+}
+
+async function parseAppsScriptResponse(response, contextLabel) {
+  const raw = await response.text();
+  let data = {};
+
+  try {
+    data = JSON.parse(raw || "{}");
+  } catch (parseErr) {
+    const e = new Error(`${contextLabel}: Apps Script respondió HTML/texto en vez de JSON. Revisa que la Web App esté publicada como "Execute as: Me" y "Who has access: Anyone", y que la URL sea la /exec. Respuesta: ${raw.slice(0, 220)}`);
+    e.statusCode = 502;
+    throw e;
+  }
+
+  return data;
 }
 
 async function trashComprobanteByUrl(archivoUrl, { required = false } = {}) {
@@ -164,6 +179,7 @@ async function trashComprobanteByUrl(archivoUrl, { required = false } = {}) {
 
   const uploadUrl = normalizeAppsScriptUrl(process.env.GOOGLE_APPS_SCRIPT_UPLOAD_URL);
   const secret = String(process.env.COMPROBANTES_UPLOAD_SECRET || "").trim();
+  const fileId = extractDriveFileId(clean);
 
   if (!uploadUrl || !secret) {
     const msg = "Falta configurar GOOGLE_APPS_SCRIPT_UPLOAD_URL o COMPROBANTES_UPLOAD_SECRET para borrar comprobantes.";
@@ -175,42 +191,67 @@ async function trashComprobanteByUrl(archivoUrl, { required = false } = {}) {
     return { ok: false, warning: msg };
   }
 
-  const deleteUrl = new URL(uploadUrl);
-  deleteUrl.searchParams.set("secret", secret);
-  deleteUrl.searchParams.set("action", "delete");
-  deleteUrl.searchParams.set("fileId", extractDriveFileId(clean));
-  deleteUrl.searchParams.set("archivoUrl", clean);
+  const body = {
+    secret,
+    action: "delete",
+    fileId,
+    archivoUrl: clean,
+  };
 
-  const response = await fetch(deleteUrl.toString(), {
-    method: "GET",
-  });
-
-  const raw = await response.text();
-  let data = {};
+  let data;
   try {
-    data = JSON.parse(raw || "{}");
-  } catch (parseErr) {
-    const msg = `Apps Script respondió algo inválido al borrar comprobante: ${raw.slice(0, 250)}`;
-    if (required) {
-      const e = new Error(msg);
-      e.statusCode = 502;
-      throw e;
-    }
-    return { ok: false, warning: msg };
-  }
+    // Borrado principal: POST, igual que la subida. Evita errores HTML que a veces da Apps Script con GET desde Netlify.
+    const response = await fetch(uploadUrl, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify(body),
+      redirect: "follow",
+    });
 
-  if (!response.ok || data.ok === false) {
-    const msg = data.error || `Apps Script HTTP ${response.status}`;
-    const finalMsg = looksLikeOldAppsScriptWithoutDelete(msg) ? deleteSupportMessage() : msg;
-    if (required) {
-      const e = new Error(`No pude borrar el comprobante adjunto: ${finalMsg}`);
+    data = await parseAppsScriptResponse(response, "Borrando comprobante");
+
+    if (!response.ok || data.ok === false) {
+      const msg = data.error || `Apps Script HTTP ${response.status}`;
+      const finalMsg = looksLikeOldAppsScriptWithoutDelete(msg) ? deleteSupportMessage() : msg;
+      const e = new Error(finalMsg);
       e.statusCode = response.ok ? 400 : response.status;
       throw e;
     }
-    return { ok: false, warning: `No pude borrar el comprobante anterior: ${finalMsg}` };
+  } catch (postErr) {
+    // Fallback GET solo para casos donde el POST sea bloqueado por una configuración rara.
+    try {
+      const deleteUrl = new URL(uploadUrl);
+      deleteUrl.searchParams.set("secret", secret);
+      deleteUrl.searchParams.set("action", "delete");
+      if (fileId) deleteUrl.searchParams.set("fileId", fileId);
+      deleteUrl.searchParams.set("archivoUrl", clean);
+
+      const response = await fetch(deleteUrl.toString(), {
+        method: "GET",
+        redirect: "follow",
+      });
+
+      data = await parseAppsScriptResponse(response, "Borrando comprobante por GET");
+
+      if (!response.ok || data.ok === false) {
+        const msg = data.error || `Apps Script HTTP ${response.status}`;
+        const finalMsg = looksLikeOldAppsScriptWithoutDelete(msg) ? deleteSupportMessage() : msg;
+        const e = new Error(finalMsg);
+        e.statusCode = response.ok ? 400 : response.status;
+        throw e;
+      }
+    } catch (getErr) {
+      const finalMsg = getErr.message || postErr.message || String(getErr || postErr);
+      if (required) {
+        const e = new Error(`No pude borrar el comprobante adjunto: ${finalMsg}`);
+        e.statusCode = getErr.statusCode || postErr.statusCode || 502;
+        throw e;
+      }
+      return { ok: false, warning: `No pude borrar el comprobante anterior: ${finalMsg}` };
+    }
   }
 
-  return data;
+  return data || { ok: true };
 }
 
 
