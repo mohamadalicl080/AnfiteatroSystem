@@ -182,8 +182,11 @@ function doGet(e) {
 
     return json_({
       ok: true,
-      message: 'Apps Script puede crear archivos en esta carpeta.',
+      message: 'Apps Script puede crear archivos en esta carpeta y tiene activada la función para eliminar comprobantes.',
       folderName: folder.getName(),
+      canUpload: true,
+      canDelete: true,
+      actions: ['upload', 'delete'],
       storageLimit: storageLimit,
       storageUsed: storageUsed,
       testFileCreated: true,

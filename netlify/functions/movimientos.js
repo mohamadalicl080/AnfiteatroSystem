@@ -145,6 +145,17 @@ function sameDriveFile(a, b) {
   return String(a || "").trim() === String(b || "").trim();
 }
 
+function looksLikeOldAppsScriptWithoutDelete(msg) {
+  const t = String(msg || "").toLowerCase();
+  return t.includes("debes adjuntar un comprobante")
+    || t.includes("debes adjuntar un comprobante válido")
+    || t.includes("debes adjuntar un comprobante valido");
+}
+
+function deleteSupportMessage() {
+  return "Tu Apps Script publicado todavía es la versión anterior y no tiene la función para borrar comprobantes. Reemplaza el código con tools/apps-script-comprobantes.gs y publica una New version en Apps Script.";
+}
+
 async function trashComprobanteByUrl(archivoUrl, { required = false } = {}) {
   const clean = String(archivoUrl || "").trim();
   if (!clean) return { ok: true, skipped: true };
@@ -189,12 +200,13 @@ async function trashComprobanteByUrl(archivoUrl, { required = false } = {}) {
 
   if (!response.ok || data.ok === false) {
     const msg = data.error || `Apps Script HTTP ${response.status}`;
+    const finalMsg = looksLikeOldAppsScriptWithoutDelete(msg) ? deleteSupportMessage() : msg;
     if (required) {
-      const e = new Error(`No pude borrar el comprobante adjunto: ${msg}`);
+      const e = new Error(`No pude borrar el comprobante adjunto: ${finalMsg}`);
       e.statusCode = response.ok ? 400 : response.status;
       throw e;
     }
-    return { ok: false, warning: `No pude borrar el comprobante anterior: ${msg}` };
+    return { ok: false, warning: `No pude borrar el comprobante anterior: ${finalMsg}` };
   }
 
   return data;
