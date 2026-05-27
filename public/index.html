@@ -472,7 +472,16 @@
               <label class="block text-sm font-semibold text-gray-700 mb-2">Archivos escaneados</label>
               <input id="actasFiles" type="file" multiple accept="image/*,.pdf"
                 class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition duration-200 bg-white">
-              <p class="text-xs text-gray-500 mt-1">Puedes seleccionar varias actas a la vez. Formatos: PDF o imagen. Máximo 20 MB por archivo.</p>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-3">
+                <button id="scanActaBtn" type="button" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg font-semibold shadow-md transition duration-200 flex items-center justify-center">
+                  <i class="fas fa-camera mr-2"></i>Escanear directo
+                </button>
+                <button id="clearActasFilesBtn" type="button" class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2.5 rounded-lg font-semibold transition duration-200 flex items-center justify-center">
+                  <i class="fas fa-eraser mr-2"></i>Limpiar selección
+                </button>
+              </div>
+              <input id="actasScanFile" type="file" accept="image/*,.pdf" capture="environment" class="hidden">
+              <p class="text-xs text-gray-500 mt-1">Puedes seleccionar varias actas a la vez o usar Escanear directo desde celular/cámara. Formatos: PDF o imagen. Máximo 20 MB por archivo.</p>
             </div>
             <div>
               <label class="block text-sm font-semibold text-gray-700 mb-2">N° de acta / referencia</label>
@@ -502,15 +511,37 @@
         </div>
 
         <div class="lg:col-span-2">
-          <div class="flex flex-col md:flex-row gap-3 md:items-center md:justify-between mb-4">
-            <div class="relative flex-1">
-              <i class="fas fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
-              <input id="actasSearch" type="text" placeholder="Buscar por nombre, número, fecha, registro o descripción..."
-                class="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+          <div class="flex flex-col gap-3 mb-4">
+            <div class="flex flex-col md:flex-row gap-3 md:items-center md:justify-between">
+              <div class="relative flex-1">
+                <i class="fas fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                <input id="actasSearch" type="text" placeholder="Buscar por nombre, número, fecha, registro o descripción..."
+                  class="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+              </div>
+              <button id="refreshActasBtn" type="button" class="bg-gray-700 hover:bg-gray-800 text-white px-5 py-2.5 rounded-lg font-semibold shadow-md transition duration-200">
+                <i class="fas fa-rotate mr-2"></i>Actualizar
+              </button>
             </div>
-            <button id="refreshActasBtn" type="button" class="bg-gray-700 hover:bg-gray-800 text-white px-5 py-2.5 rounded-lg font-semibold shadow-md transition duration-200">
-              <i class="fas fa-rotate mr-2"></i>Actualizar
-            </button>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3 bg-gray-50 border border-gray-200 rounded-lg p-3">
+              <div>
+                <label class="block text-xs font-semibold text-gray-700 mb-1">Ordenar</label>
+                <select id="actasSort" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white">
+                  <option value="fecha-desc">Fecha de acta: más reciente</option>
+                  <option value="fecha-asc">Fecha de acta: más antigua</option>
+                  <option value="subida-desc">Fecha subida: más reciente</option>
+                  <option value="subida-asc">Fecha subida: más antigua</option>
+                  <option value="nombre-asc">Nombre archivo: A-Z</option>
+                </select>
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-gray-700 mb-1">Desde fecha acta</label>
+                <input id="actasFechaDesde" type="date" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white">
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-gray-700 mb-1">Hasta fecha acta</label>
+                <input id="actasFechaHasta" type="date" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white">
+              </div>
+            </div>
           </div>
 
           <div class="overflow-x-auto border border-gray-200 rounded-xl">
@@ -2923,6 +2954,19 @@ function renderResumenMensual() {
       return "fa-file text-gray-600";
     }
 
+    function actaDownloadUrl(item) {
+      const id = String(item?.id || "").trim();
+      if (item?.webContentLink) return item.webContentLink;
+      return id ? `https://drive.google.com/uc?export=download&id=${encodeURIComponent(id)}` : (item?.webViewLink || "");
+    }
+
+    function actaDateValue(value) {
+      const clean = String(value || "").trim();
+      if (!clean) return 0;
+      const dt = new Date(clean);
+      return isNaN(dt) ? 0 : dt.getTime();
+    }
+
     async function loadActas({ force = false } = {}) {
       const now = Date.now();
       if (!force && ACTAS.loadedAt && (now - ACTAS.loadedAt) < 10000) {
@@ -2941,10 +2985,28 @@ function renderResumenMensual() {
       const tbody = document.getElementById("actasBody");
       if (!tbody) return;
       const q = norm(document.getElementById("actasSearch")?.value || "");
+      const sortMode = document.getElementById("actasSort")?.value || "fecha-desc";
+      const desde = document.getElementById("actasFechaDesde")?.value || "";
+      const hasta = document.getElementById("actasFechaHasta")?.value || "";
+      const desdeMs = desde ? actaDateValue(desde) : 0;
+      const hastaMs = hasta ? actaDateValue(hasta + "T23:59:59") : 0;
+
       const items = (ACTAS.items || []).filter(item => {
         const meta = parseActaDescription(item.description);
         const hay = norm([item.name, meta.numero, meta.fecha, meta.registro, meta.descripcion, meta.usuario].join(" "));
-        return !q || hay.includes(q);
+        const fechaActaMs = actaDateValue(meta.fecha);
+        if (q && !hay.includes(q)) return false;
+        if (desdeMs && (!fechaActaMs || fechaActaMs < desdeMs)) return false;
+        if (hastaMs && (!fechaActaMs || fechaActaMs > hastaMs)) return false;
+        return true;
+      }).sort((a, b) => {
+        const ma = parseActaDescription(a.description);
+        const mb = parseActaDescription(b.description);
+        if (sortMode === "fecha-asc") return actaDateValue(ma.fecha) - actaDateValue(mb.fecha) || String(a.name || "").localeCompare(String(b.name || ""));
+        if (sortMode === "subida-desc") return actaDateValue(b.createdTime) - actaDateValue(a.createdTime);
+        if (sortMode === "subida-asc") return actaDateValue(a.createdTime) - actaDateValue(b.createdTime);
+        if (sortMode === "nombre-asc") return String(a.name || "").localeCompare(String(b.name || ""), "es");
+        return actaDateValue(mb.fecha) - actaDateValue(ma.fecha) || actaDateValue(b.createdTime) - actaDateValue(a.createdTime);
       });
 
       setText("actasCount", String(ACTAS.items?.length || 0));
@@ -2959,6 +3021,7 @@ function renderResumenMensual() {
         const meta = parseActaDescription(item.description);
         const created = item.createdTime ? new Date(item.createdTime).toLocaleString("es-CL") : "";
         const link = item.webViewLink || item.webContentLink || "";
+        const downloadLink = actaDownloadUrl(item);
         const tr = document.createElement("tr");
         tr.className = "hover:bg-gray-50 transition duration-150";
         tr.innerHTML = `
@@ -2980,6 +3043,7 @@ function renderResumenMensual() {
           <td class="px-6 py-4 align-top whitespace-nowrap text-sm text-gray-700">${created}</td>
           <td class="px-6 py-4 align-top whitespace-nowrap text-sm">
             ${link ? `<a href="${escapeHtml(link)}" target="_blank" rel="noopener" class="text-purple-700 hover:text-purple-900 font-semibold mr-3"><i class="fas fa-eye mr-1"></i>Ver</a>` : ""}
+            ${downloadLink ? `<a href="${escapeHtml(downloadLink)}" target="_blank" rel="noopener" download class="text-blue-700 hover:text-blue-900 font-semibold mr-3"><i class="fas fa-download mr-1"></i>Descargar</a>` : ""}
             <button type="button" data-action="delete-acta" data-id="${escapeHtml(item.id || "")}" class="text-red-600 hover:text-red-800 font-semibold"><i class="fas fa-trash mr-1"></i>Eliminar</button>
           </td>
         `;
@@ -2987,8 +3051,8 @@ function renderResumenMensual() {
       });
     }
 
-    async function uploadActasSelected() {
-      const input = document.getElementById("actasFiles");
+    async function uploadActasSelected(inputOverride = null) {
+      const input = inputOverride || document.getElementById("actasFiles");
       const status = document.getElementById("actasUploadStatus");
       const files = Array.from(input?.files || []);
       if (!files.length) return alert("Selecciona uno o más archivos escaneados para subir.");
@@ -3026,6 +3090,10 @@ function renderResumenMensual() {
         }
         if (status) status.textContent = `✅ ${files.length} acta(s) archivada(s) correctamente.`;
         if (input) input.value = "";
+        const mainInput = document.getElementById("actasFiles");
+        const scanInput = document.getElementById("actasScanFile");
+        if (mainInput) mainInput.value = "";
+        if (scanInput) scanInput.value = "";
         ACTAS.loadedAt = 0;
         await loadActas({ force: true });
       } catch (e) {
@@ -3096,9 +3164,26 @@ function renderResumenMensual() {
         renderResumenMensual();
       });
 
-      document.getElementById("uploadActasBtn")?.addEventListener("click", uploadActasSelected);
+      document.getElementById("uploadActasBtn")?.addEventListener("click", () => uploadActasSelected());
+      document.getElementById("scanActaBtn")?.addEventListener("click", () => document.getElementById("actasScanFile")?.click());
+      document.getElementById("actasScanFile")?.addEventListener("change", (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        uploadActasSelected(e.target);
+      });
+      document.getElementById("clearActasFilesBtn")?.addEventListener("click", () => {
+        const filesInput = document.getElementById("actasFiles");
+        const scanInput = document.getElementById("actasScanFile");
+        if (filesInput) filesInput.value = "";
+        if (scanInput) scanInput.value = "";
+        const status = document.getElementById("actasUploadStatus");
+        if (status) status.textContent = "";
+      });
       document.getElementById("refreshActasBtn")?.addEventListener("click", () => loadActas({ force: true }).catch(err => alert("❌ Error cargando actas: " + (err.message || err))));
       document.getElementById("actasSearch")?.addEventListener("input", renderActas);
+      document.getElementById("actasSort")?.addEventListener("change", renderActas);
+      document.getElementById("actasFechaDesde")?.addEventListener("change", renderActas);
+      document.getElementById("actasFechaHasta")?.addEventListener("change", renderActas);
 
       // Campana (navbar): abre pestaña Alertas
       const bellBtn = document.getElementById("navBellBtn");

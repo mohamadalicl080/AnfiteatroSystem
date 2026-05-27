@@ -45,7 +45,7 @@ function fileToItem_(file) {
     createdTime: file.getDateCreated() ? file.getDateCreated().toISOString() : '',
     modifiedTime: file.getLastUpdated() ? file.getLastUpdated().toISOString() : '',
     webViewLink: file.getUrl(),
-    webContentLink: '',
+    webContentLink: 'https://drive.google.com/uc?export=download&id=' + encodeURIComponent(file.getId()),
     thumbnailLink: '',
     description: file.getDescription() || ''
   };
