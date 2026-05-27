@@ -469,10 +469,7 @@
           <h3 class="text-lg font-bold text-gray-800 mb-4"><i class="fas fa-cloud-upload-alt text-purple-600 mr-2"></i>Subir escaneos</h3>
           <div class="space-y-4">
             <div>
-              <label class="block text-sm font-semibold text-gray-700 mb-2">Archivos escaneados</label>
-              <input id="actasFiles" type="file" multiple accept="image/*,.pdf"
-                class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition duration-200 bg-white">
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-3">
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <button id="scanActaBtn" type="button" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-lg font-semibold shadow-md transition duration-200 flex items-center justify-center">
                   <i class="fas fa-camera mr-2"></i>Escanear directo
                 </button>
@@ -481,7 +478,7 @@
                 </button>
               </div>
               <input id="actasScanFile" type="file" accept="image/*,.pdf" capture="environment" class="hidden">
-              <p class="text-xs text-gray-500 mt-1">Puedes seleccionar varias actas a la vez o usar Escanear directo desde celular/cámara. Formatos: PDF o imagen. Las fotos de cámara se comprimen automáticamente antes de subir.</p>
+              <p class="text-xs text-gray-500 mt-2">Usa Escanear directo desde celular/cámara para seleccionar el acta. Formatos: PDF o imagen. Las fotos de cámara se comprimen automáticamente antes de subir.</p>
             </div>
             <div>
               <label class="block text-sm font-semibold text-gray-700 mb-2">N° de acta / referencia</label>
@@ -504,7 +501,7 @@
                 class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition duration-200 bg-white"></textarea>
             </div>
             <button id="uploadActasBtn" type="button" class="w-full gradient-bg text-white px-6 py-3 rounded-lg font-semibold hover:shadow-lg transition duration-200">
-              <i class="fas fa-save mr-2"></i>Guardar actas en Drive
+              <i class="fas fa-save mr-2"></i>Guardar Actas
             </button>
             <div id="actasUploadStatus" class="text-sm text-gray-600"></div>
           </div>
@@ -3115,10 +3112,10 @@ function renderResumenMensual() {
     }
 
     async function uploadActasSelected(inputOverride = null) {
-      const input = inputOverride || document.getElementById("actasFiles");
+      const input = inputOverride || document.getElementById("actasScanFile");
       const status = document.getElementById("actasUploadStatus");
       const files = Array.from(input?.files || []);
-      if (!files.length) return alert("Selecciona uno o más archivos escaneados para subir.");
+      if (!files.length) return alert("Usa Escanear directo para seleccionar un acta antes de guardar.");
 
       for (const file of files) {
         if (file.size > MAX_ACTA_BYTES) {
@@ -3158,9 +3155,7 @@ function renderResumenMensual() {
         }
         if (status) status.textContent = `✅ ${files.length} acta(s) archivada(s) correctamente.`;
         if (input) input.value = "";
-        const mainInput = document.getElementById("actasFiles");
         const scanInput = document.getElementById("actasScanFile");
-        if (mainInput) mainInput.value = "";
         if (scanInput) scanInput.value = "";
         ACTAS.loadedAt = 0;
         await loadActas({ force: true });
@@ -3235,14 +3230,16 @@ function renderResumenMensual() {
       document.getElementById("uploadActasBtn")?.addEventListener("click", () => uploadActasSelected());
       document.getElementById("scanActaBtn")?.addEventListener("click", () => document.getElementById("actasScanFile")?.click());
       document.getElementById("actasScanFile")?.addEventListener("change", (e) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-        uploadActasSelected(e.target);
+        const files = Array.from(e.target.files || []);
+        const status = document.getElementById("actasUploadStatus");
+        if (!files.length) {
+          if (status) status.textContent = "";
+          return;
+        }
+        if (status) status.textContent = `Archivo seleccionado: ${files.map(f => f.name).join(", ")}. Presiona Guardar Actas para archivarlo.`;
       });
       document.getElementById("clearActasFilesBtn")?.addEventListener("click", () => {
-        const filesInput = document.getElementById("actasFiles");
         const scanInput = document.getElementById("actasScanFile");
-        if (filesInput) filesInput.value = "";
         if (scanInput) scanInput.value = "";
         const status = document.getElementById("actasUploadStatus");
         if (status) status.textContent = "";
