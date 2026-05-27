@@ -167,6 +167,9 @@
         <button class="tabs-btn py-4 text-gray-600 hover:text-purple-600 whitespace-nowrap" data-tab="otros">
           <i class="fas fa-folder mr-2"></i>Otros
         </button>
+        <button class="tabs-btn py-4 text-gray-600 hover:text-purple-600 whitespace-nowrap" data-tab="actas">
+          <i class="fas fa-file-contract mr-2"></i>Actas Administrativas
+        </button>
         <button class="tabs-btn py-4 text-gray-600 hover:text-purple-600 whitespace-nowrap" data-tab="alertas">
           <i class="fas fa-bell mr-2"></i>Alertas
           <span id="tabAlertasBadge" class="ml-1 bg-red-500 text-white text-xs px-2 py-0.5 rounded-full hidden">0</span>
@@ -445,6 +448,86 @@
       <div class="flex justify-between items-center mt-6">
         <p id="otrosInfo" class="text-sm text-gray-600">Mostrando 0-0 de 0 movimientos</p>
         <div id="otrosPagination" class="flex space-x-2"></div>
+      </div>
+    </div>
+
+    <!-- Actas Administrativas -->
+    <div id="actas-tab" class="hidden bg-white rounded-b-xl shadow-lg p-6">
+      <div class="flex flex-col lg:flex-row lg:justify-between lg:items-start gap-4 mb-6">
+        <div>
+          <h2 class="text-2xl font-bold text-gray-800"><i class="fas fa-file-contract mr-2 text-purple-600"></i>Actas Administrativas</h2>
+          <p class="text-sm text-gray-500 mt-1">Archivo digital de respaldo para actas físicas firmadas, timbradas o registradas en libro.</p>
+        </div>
+        <div class="text-sm text-gray-600 bg-purple-50 border border-purple-200 rounded-lg px-4 py-3">
+          Carpeta Drive: <span class="font-semibold">Actas Administrativas</span><br>
+          Total archivadas: <span id="actasCount" class="font-semibold">0</span>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+        <div class="lg:col-span-1 bg-gray-50 border border-gray-200 rounded-xl p-5">
+          <h3 class="text-lg font-bold text-gray-800 mb-4"><i class="fas fa-cloud-upload-alt text-purple-600 mr-2"></i>Subir escaneos</h3>
+          <div class="space-y-4">
+            <div>
+              <label class="block text-sm font-semibold text-gray-700 mb-2">Archivos escaneados</label>
+              <input id="actasFiles" type="file" multiple accept="image/*,.pdf"
+                class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition duration-200 bg-white">
+              <p class="text-xs text-gray-500 mt-1">Puedes seleccionar varias actas a la vez. Formatos: PDF o imagen. Máximo 20 MB por archivo.</p>
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-gray-700 mb-2">N° de acta / referencia</label>
+              <input id="actaNumero" type="text" placeholder="Ej: Acta 001 / Libro 2 Folio 15"
+                class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition duration-200 bg-white">
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-gray-700 mb-2">Fecha del acta</label>
+              <input id="actaFecha" type="date"
+                class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition duration-200 bg-white">
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-gray-700 mb-2">Registrada / timbrada en</label>
+              <input id="actaRegistro" type="text" placeholder="Ej: Libro físico / Notaría / Folio"
+                class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition duration-200 bg-white">
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-gray-700 mb-2">Descripción</label>
+              <textarea id="actaDescripcion" rows="3" placeholder="Breve detalle para encontrarla después..."
+                class="w-full px-4 py-3 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition duration-200 bg-white"></textarea>
+            </div>
+            <button id="uploadActasBtn" type="button" class="w-full gradient-bg text-white px-6 py-3 rounded-lg font-semibold hover:shadow-lg transition duration-200">
+              <i class="fas fa-save mr-2"></i>Guardar actas en Drive
+            </button>
+            <div id="actasUploadStatus" class="text-sm text-gray-600"></div>
+          </div>
+        </div>
+
+        <div class="lg:col-span-2">
+          <div class="flex flex-col md:flex-row gap-3 md:items-center md:justify-between mb-4">
+            <div class="relative flex-1">
+              <i class="fas fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+              <input id="actasSearch" type="text" placeholder="Buscar por nombre, número, fecha, registro o descripción..."
+                class="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent">
+            </div>
+            <button id="refreshActasBtn" type="button" class="bg-gray-700 hover:bg-gray-800 text-white px-5 py-2.5 rounded-lg font-semibold shadow-md transition duration-200">
+              <i class="fas fa-rotate mr-2"></i>Actualizar
+            </button>
+          </div>
+
+          <div class="overflow-x-auto border border-gray-200 rounded-xl">
+            <table class="min-w-full divide-y divide-gray-200">
+              <thead class="bg-gray-100">
+                <tr>
+                  <th class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Archivo</th>
+                  <th class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Detalle</th>
+                  <th class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Fecha subida</th>
+                  <th class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="actasBody" class="bg-white divide-y divide-gray-200"></tbody>
+            </table>
+          </div>
+          <p class="text-xs text-gray-400 mt-3">Esta sección no reemplaza el libro físico ni la notaría; solo mantiene una copia digital de respaldo.</p>
+        </div>
       </div>
     </div>
 
@@ -762,7 +845,7 @@
     // Tabs
     const TAB_IDS = [
       "movimientos","gastos","arriendos","proveedores","empleados",
-      "caja-chica","otros","alertas","resumen","actividad"
+      "caja-chica","otros","actas","alertas","resumen","actividad"
     ];
     let CURRENT_TAB = "movimientos";
 
@@ -962,6 +1045,7 @@
       if (["gastos","arriendos","proveedores","empleados","caja-chica","otros"].includes(safeTab)) {
         renderAreaTabs();
       }
+      if (safeTab === "actas") loadActas().catch(err => console.error("No pude cargar actas:", err));
       if (safeTab === "alertas") renderAlertas();
       if (safeTab === "resumen") renderResumenMensual();
       if (safeTab === "actividad") { ACT_PAG.page = 1; renderActividad(); }
@@ -2808,6 +2892,162 @@ function renderResumenMensual() {
       }
     }
 
+
+    // -----------------------------
+    // Actas Administrativas
+    // -----------------------------
+    const ACTAS = { items: [], loadedAt: 0 };
+    const MAX_ACTA_BYTES = 20 * 1024 * 1024;
+
+    function parseActaDescription(raw) {
+      const text = String(raw || "");
+      try {
+        const obj = JSON.parse(text);
+        return obj && typeof obj === "object" ? obj : { descripcion: text };
+      } catch {
+        return { descripcion: text };
+      }
+    }
+
+    function formatFileSize(bytes) {
+      const n = Number(bytes) || 0;
+      if (n < 1024) return `${n} B`;
+      if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+      return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+    }
+
+    function actaIcon(mimeType) {
+      const mt = String(mimeType || "");
+      if (mt.includes("pdf")) return "fa-file-pdf text-red-600";
+      if (mt.startsWith("image/")) return "fa-file-image text-blue-600";
+      return "fa-file text-gray-600";
+    }
+
+    async function loadActas({ force = false } = {}) {
+      const now = Date.now();
+      if (!force && ACTAS.loadedAt && (now - ACTAS.loadedAt) < 10000) {
+        renderActas();
+        return;
+      }
+      const tbody = document.getElementById("actasBody");
+      if (tbody) tbody.innerHTML = `<tr><td colspan="4" class="px-6 py-6 text-sm text-gray-500">Cargando actas...</td></tr>`;
+      const data = await apiFetch("/.netlify/functions/actas");
+      ACTAS.items = data.items || [];
+      ACTAS.loadedAt = now;
+      renderActas();
+    }
+
+    function renderActas() {
+      const tbody = document.getElementById("actasBody");
+      if (!tbody) return;
+      const q = norm(document.getElementById("actasSearch")?.value || "");
+      const items = (ACTAS.items || []).filter(item => {
+        const meta = parseActaDescription(item.description);
+        const hay = norm([item.name, meta.numero, meta.fecha, meta.registro, meta.descripcion, meta.usuario].join(" "));
+        return !q || hay.includes(q);
+      });
+
+      setText("actasCount", String(ACTAS.items?.length || 0));
+      tbody.innerHTML = "";
+
+      if (items.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="4" class="px-6 py-6 text-sm text-gray-500">No hay actas para mostrar.</td></tr>`;
+        return;
+      }
+
+      items.forEach(item => {
+        const meta = parseActaDescription(item.description);
+        const created = item.createdTime ? new Date(item.createdTime).toLocaleString("es-CL") : "";
+        const link = item.webViewLink || item.webContentLink || "";
+        const tr = document.createElement("tr");
+        tr.className = "hover:bg-gray-50 transition duration-150";
+        tr.innerHTML = `
+          <td class="px-6 py-4 align-top">
+            <div class="flex items-start gap-3">
+              <i class="fas ${actaIcon(item.mimeType)} text-2xl mt-1"></i>
+              <div>
+                <div class="text-sm font-semibold text-gray-900 break-all">${escapeHtml(item.name || "Acta")}</div>
+                <div class="text-xs text-gray-500">${formatFileSize(item.size)} · ${escapeHtml(item.mimeType || "")}</div>
+              </div>
+            </div>
+          </td>
+          <td class="px-6 py-4 align-top text-sm text-gray-700">
+            ${meta.numero ? `<div><span class="font-semibold">N°/Ref:</span> ${escapeHtml(meta.numero)}</div>` : ""}
+            ${meta.fecha ? `<div><span class="font-semibold">Fecha acta:</span> ${formatFechaISO(meta.fecha)}</div>` : ""}
+            ${meta.registro ? `<div><span class="font-semibold">Registro:</span> ${escapeHtml(meta.registro)}</div>` : ""}
+            ${meta.descripcion ? `<div class="mt-1 text-gray-600">${escapeHtml(meta.descripcion)}</div>` : ""}
+          </td>
+          <td class="px-6 py-4 align-top whitespace-nowrap text-sm text-gray-700">${created}</td>
+          <td class="px-6 py-4 align-top whitespace-nowrap text-sm">
+            ${link ? `<a href="${escapeHtml(link)}" target="_blank" rel="noopener" class="text-purple-700 hover:text-purple-900 font-semibold mr-3"><i class="fas fa-eye mr-1"></i>Ver</a>` : ""}
+            <button type="button" data-action="delete-acta" data-id="${escapeHtml(item.id || "")}" class="text-red-600 hover:text-red-800 font-semibold"><i class="fas fa-trash mr-1"></i>Eliminar</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    async function uploadActasSelected() {
+      const input = document.getElementById("actasFiles");
+      const status = document.getElementById("actasUploadStatus");
+      const files = Array.from(input?.files || []);
+      if (!files.length) return alert("Selecciona uno o más archivos escaneados para subir.");
+
+      for (const file of files) {
+        if (file.size > MAX_ACTA_BYTES) {
+          return alert(`❌ ${file.name} supera 20 MB. Comprime el archivo o divide el escaneo.`);
+        }
+      }
+
+      const meta = {
+        numero: document.getElementById("actaNumero")?.value || "",
+        fecha: document.getElementById("actaFecha")?.value || "",
+        registro: document.getElementById("actaRegistro")?.value || "",
+        descripcion: document.getElementById("actaDescripcion")?.value || "",
+        usuario: currentUser?.name || currentUser?.email || "Usuario"
+      };
+
+      const btn = document.getElementById("uploadActasBtn");
+      if (btn) btn.disabled = true;
+      try {
+        for (let i = 0; i < files.length; i++) {
+          const file = files[i];
+          if (status) status.textContent = `Subiendo ${i + 1} de ${files.length}: ${file.name}`;
+          const formData = new FormData();
+          formData.append("file", file, file.name || "acta");
+          Object.entries(meta).forEach(([k, v]) => formData.append(k, v || ""));
+          const res = await fetch("/.netlify/functions/actas", {
+            method: "POST",
+            headers: { ...(authToken ? { "Authorization": `Bearer ${authToken}` } : {}) },
+            body: formData
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok || data.ok === false) throw new Error(data.error || `HTTP ${res.status}`);
+        }
+        if (status) status.textContent = `✅ ${files.length} acta(s) archivada(s) correctamente.`;
+        if (input) input.value = "";
+        ACTAS.loadedAt = 0;
+        await loadActas({ force: true });
+      } catch (e) {
+        if (status) status.textContent = "";
+        alert("❌ Error subiendo actas: " + (e.message || e));
+      } finally {
+        if (btn) btn.disabled = false;
+      }
+    }
+
+    async function deleteActaById(id) {
+      if (!id) return;
+      if (!confirm("¿Eliminar esta copia digital de Google Drive?")) return;
+      try {
+        await apiFetch(`/.netlify/functions/actas?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+        ACTAS.loadedAt = 0;
+        await loadActas({ force: true });
+      } catch (e) {
+        alert("❌ Error eliminando acta: " + (e.message || e));
+      }
+    }
+
     async function loadMovimientos() {
       const data = await apiFetch("/.netlify/functions/movimientos");
       MOV.header = data.header || [];
@@ -2855,6 +3095,10 @@ function renderResumenMensual() {
         RESUMEN_SELECTED_MONTH = e.target.value || RESUMEN_SELECTED_MONTH;
         renderResumenMensual();
       });
+
+      document.getElementById("uploadActasBtn")?.addEventListener("click", uploadActasSelected);
+      document.getElementById("refreshActasBtn")?.addEventListener("click", () => loadActas({ force: true }).catch(err => alert("❌ Error cargando actas: " + (err.message || err))));
+      document.getElementById("actasSearch")?.addEventListener("input", renderActas);
 
       // Campana (navbar): abre pestaña Alertas
       const bellBtn = document.getElementById("navBellBtn");
@@ -2917,6 +3161,7 @@ function renderResumenMensual() {
         if (action === "print") printTicketById(id);
         if (action === "edit") openEditModalById(id);
         if (action === "delete") deleteMovimientoById(id);
+        if (action === "delete-acta") deleteActaById(id);
         if (action === "abonar") openAbonoModalByConvenioId(btn.dataset.conv);
       });
 
