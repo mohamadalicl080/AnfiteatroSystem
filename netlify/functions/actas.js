@@ -1,155 +1,175 @@
-const { Readable } = require("stream");
-const { google } = require("googleapis");
+const { json } = require("./_lib/http");
+const { requireAuth } = require("./_lib/auth");
 
 const ACTAS_FOLDER_NAME = "Actas Administrativas";
-const MAX_FILE_BYTES = 20 * 1024 * 1024;
+const MAX_ACTA_BYTES = 20 * 1024 * 1024;
+const FILE_TOO_LARGE_MSG = "El acta supera 20 MB. Comprime el archivo o divide el escaneo.";
 
-function json(statusCode, body) {
-  return {
-    statusCode,
-    headers: { "Content-Type": "application/json; charset=utf-8" },
-    body: JSON.stringify(body)
+function withCors(resp) {
+  resp.headers = {
+    ...(resp.headers || {}),
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization, x-api-key",
+    "Access-Control-Allow-Methods": "GET,POST,DELETE,OPTIONS",
   };
+  return resp;
 }
 
-function cleanName(value) {
-  return String(value || "")
-    .replace(/[\\/:*?"<>|]+/g, "-")
+function getHeader(event, name) {
+  const headers = event.headers || {};
+  const key = Object.keys(headers).find(k => k.toLowerCase() === name.toLowerCase());
+  return key ? headers[key] : "";
+}
+
+function cleanName(value, fallback = "acta") {
+  const cleaned = String(value || fallback)
+    .replace(/[\\/:*?"<>|]/g, "-")
     .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, 160);
+    .trim();
+  return (cleaned || fallback).slice(0, 160);
 }
 
-function bufferIndexOf(buf, sub, start = 0) {
-  return buf.indexOf(sub, start);
+function parseContentDisposition(value) {
+  const out = {};
+  for (const piece of String(value || "").split(";")) {
+    const [rawKey, ...rawVal] = piece.trim().split("=");
+    if (!rawKey || !rawVal.length) continue;
+    let val = rawVal.join("=").trim();
+    if (val.startsWith('"') && val.endsWith('"')) val = val.slice(1, -1);
+    out[rawKey.toLowerCase()] = val;
+  }
+  return out;
 }
 
 function parseMultipart(event) {
-  const contentType = event.headers["content-type"] || event.headers["Content-Type"] || "";
-  const boundaryMatch = contentType.match(/boundary=(?:(?:"([^"]+)")|([^;]+))/i);
-  if (!boundaryMatch) throw new Error("No se encontró boundary multipart.");
-  const boundary = Buffer.from("--" + (boundaryMatch[1] || boundaryMatch[2] || ""));
-  const body = Buffer.from(event.body || "", event.isBase64Encoded ? "base64" : "utf8");
+  const contentType = getHeader(event, "content-type");
+  const match = contentType.match(/boundary=(?:(?:")([^"]+)(?:")|([^;]+))/i);
+  if (!match) {
+    const e = new Error("Solicitud inválida: falta boundary multipart.");
+    e.statusCode = 400;
+    throw e;
+  }
+
+  const boundary = match[1] || match[2];
+  const body = Buffer.from(event.body || "", event.isBase64Encoded ? "base64" : "binary");
+  const delimiter = Buffer.from(`--${boundary}`);
   const fields = {};
   const files = [];
 
-  let pos = bufferIndexOf(body, boundary);
+  let pos = body.indexOf(delimiter);
   while (pos !== -1) {
-    let next = bufferIndexOf(body, boundary, pos + boundary.length);
+    pos += delimiter.length;
+    if (body.slice(pos, pos + 2).toString() === "--") break;
+    if (body.slice(pos, pos + 2).toString() === "\r\n") pos += 2;
+
+    const next = body.indexOf(delimiter, pos);
     if (next === -1) break;
 
-    let part = body.slice(pos + boundary.length, next);
-    if (part.slice(0, 2).toString() === "--") break;
-    if (part.slice(0, 2).toString() === "\r\n") part = part.slice(2);
+    let part = body.slice(pos, next);
     if (part.slice(-2).toString() === "\r\n") part = part.slice(0, -2);
 
-    const headerEnd = bufferIndexOf(part, Buffer.from("\r\n\r\n"));
-    if (headerEnd >= 0) {
-      const rawHeaders = part.slice(0, headerEnd).toString("utf8");
-      const content = part.slice(headerEnd + 4);
-      const disp = rawHeaders.match(/content-disposition:\s*form-data;([^\r\n]+)/i);
-      if (disp) {
-        const nameMatch = disp[1].match(/name="([^"]+)"/i);
-        const fileMatch = disp[1].match(/filename="([^"]*)"/i);
-        const typeMatch = rawHeaders.match(/content-type:\s*([^\r\n]+)/i);
-        const name = nameMatch ? nameMatch[1] : "";
-        if (fileMatch && fileMatch[1]) {
-          files.push({
-            fieldName: name,
-            filename: cleanName(fileMatch[1]) || "acta",
-            contentType: (typeMatch ? typeMatch[1].trim() : "application/octet-stream"),
-            buffer: content
-          });
-        } else if (name) {
-          fields[name] = content.toString("utf8");
-        }
+    const sep = part.indexOf(Buffer.from("\r\n\r\n"));
+    if (sep !== -1) {
+      const rawHeaders = part.slice(0, sep).toString("utf8");
+      const content = part.slice(sep + 4);
+      const headers = {};
+
+      for (const line of rawHeaders.split("\r\n")) {
+        const idx = line.indexOf(":");
+        if (idx === -1) continue;
+        headers[line.slice(0, idx).trim().toLowerCase()] = line.slice(idx + 1).trim();
+      }
+
+      const disposition = parseContentDisposition(headers["content-disposition"] || "");
+      const name = disposition.name;
+      const filename = disposition.filename;
+
+      if (name && filename !== undefined) {
+        files.push({
+          fieldName: name,
+          fileName: cleanName(filename || "acta"),
+          mimeType: headers["content-type"] || "application/octet-stream",
+          buffer: content,
+          size: content.length,
+        });
+      } else if (name) {
+        fields[name] = content.toString("utf8");
       }
     }
+
     pos = next;
   }
 
   return { fields, files };
 }
 
-function getServiceAccountCredentials() {
-  const raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON || process.env.GOOGLE_CREDENTIALS_JSON || process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
-  if (raw) {
-    const parsed = JSON.parse(raw);
-    if (parsed.private_key) parsed.private_key = parsed.private_key.replace(/\\n/g, "\n");
-    return parsed;
+function normalizeAppsScriptUrl(url) {
+  const clean = String(url || "").trim();
+  return clean ? clean.split("?")[0] : "";
+}
+
+function getAppsScriptConfig() {
+  const uploadUrl = normalizeAppsScriptUrl(process.env.ACTAS_APPS_SCRIPT_URL || process.env.ACTAS_APPS_SCRIPT_UPLOAD_URL);
+  const secret = String(process.env.ACTAS_UPLOAD_SECRET || "").trim();
+
+  if (!uploadUrl) {
+    const e = new Error("Falta ACTAS_APPS_SCRIPT_URL en Netlify.");
+    e.statusCode = 500;
+    throw e;
+  }
+  if (!secret) {
+    const e = new Error("Falta ACTAS_UPLOAD_SECRET en Netlify.");
+    e.statusCode = 500;
+    throw e;
+  }
+  return { uploadUrl, secret };
+}
+
+async function callActasAppsScript(payload) {
+  const { uploadUrl, secret } = getAppsScriptConfig();
+  const response = await fetch(uploadUrl, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify({ secret, ...payload }),
+  });
+
+  const raw = await response.text();
+  let data = {};
+  try {
+    data = raw ? JSON.parse(raw) : {};
+  } catch (parseErr) {
+    const e = new Error(`Apps Script respondió algo inválido: ${raw.slice(0, 250)}`);
+    e.statusCode = 502;
+    throw e;
   }
 
-  const client_email = process.env.GOOGLE_CLIENT_EMAIL;
-  const private_key = (process.env.GOOGLE_PRIVATE_KEY || "").replace(/\\n/g, "\n");
-  if (client_email && private_key) return { client_email, private_key };
+  if (!response.ok || data.ok === false) {
+    const e = new Error(data.error || `Apps Script HTTP ${response.status}`);
+    e.statusCode = response.ok ? 400 : response.status;
+    throw e;
+  }
 
-  throw new Error("Faltan credenciales Google. Define GOOGLE_SERVICE_ACCOUNT_JSON o GOOGLE_CLIENT_EMAIL + GOOGLE_PRIVATE_KEY.");
+  return data;
 }
 
-async function getDrive() {
-  const credentials = getServiceAccountCredentials();
-  const auth = new google.auth.GoogleAuth({
-    credentials,
-    scopes: ["https://www.googleapis.com/auth/drive"]
-  });
-  return google.drive({ version: "v3", auth });
+function buildStoredFileName(file, fields) {
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const numero = cleanName(fields.numero || "", "");
+  const fecha = cleanName(fields.fecha || "", "");
+  const prefix = ["ACTA", fecha, numero, stamp].filter(Boolean).join("_");
+  return cleanName(`${prefix}_${file.fileName || "acta"}`, "acta");
 }
 
-function qEscape(value) {
-  return String(value || "").replace(/'/g, "\\'");
-}
+async function uploadFromMultipart(event) {
+  const { fields, files } = parseMultipart(event);
+  const file = files.find(f => f.fieldName === "file") || files[0];
 
-async function ensureActasFolder(drive) {
-  const configured = process.env.ACTAS_DRIVE_FOLDER_ID;
-  if (configured) return configured;
-
-  const parentId = process.env.REGISTRO_LEDGER_FOLDER_ID || process.env.GOOGLE_DRIVE_PARENT_FOLDER_ID || process.env.DRIVE_PARENT_FOLDER_ID || "";
-  const parentClause = parentId ? ` and '${qEscape(parentId)}' in parents` : "";
-  const q = `mimeType='application/vnd.google-apps.folder' and name='${qEscape(ACTAS_FOLDER_NAME)}' and trashed=false${parentClause}`;
-
-  const found = await drive.files.list({
-    q,
-    fields: "files(id,name)",
-    pageSize: 1,
-    supportsAllDrives: true,
-    includeItemsFromAllDrives: true
-  });
-  if (found.data.files && found.data.files[0]) return found.data.files[0].id;
-
-  const metadata = {
-    name: ACTAS_FOLDER_NAME,
-    mimeType: "application/vnd.google-apps.folder"
-  };
-  if (parentId) metadata.parents = [parentId];
-
-  const created = await drive.files.create({
-    requestBody: metadata,
-    fields: "id",
-    supportsAllDrives: true
-  });
-  return created.data.id;
-}
-
-async function listActas(drive, folderId) {
-  const res = await drive.files.list({
-    q: `'${qEscape(folderId)}' in parents and trashed=false`,
-    orderBy: "createdTime desc",
-    pageSize: 1000,
-    fields: "files(id,name,mimeType,size,createdTime,modifiedTime,webViewLink,webContentLink,thumbnailLink,description)",
-    supportsAllDrives: true,
-    includeItemsFromAllDrives: true
-  });
-  return res.data.files || [];
-}
-
-async function uploadActa(drive, folderId, file, fields) {
-  if (!file || !file.buffer || !file.buffer.length) throw new Error("Archivo vacío o no recibido.");
-  if (file.buffer.length > MAX_FILE_BYTES) throw new Error("El archivo supera 20 MB.");
-
-  const numero = cleanName(fields.numero || "");
-  const fecha = cleanName(fields.fecha || "");
-  const prefix = ["Acta", fecha, numero].filter(Boolean).join("_");
-  const fileName = cleanName(prefix ? `${prefix}_${file.filename}` : file.filename);
+  if (!file || !file.size) {
+    return json(400, { ok: false, error: "Debes adjuntar un acta válida." });
+  }
+  if (file.size > MAX_ACTA_BYTES) {
+    return json(400, { ok: false, error: FILE_TOO_LARGE_MSG });
+  }
 
   const description = JSON.stringify({
     numero: fields.numero || "",
@@ -158,58 +178,67 @@ async function uploadActa(drive, folderId, file, fields) {
     descripcion: fields.descripcion || "",
     usuario: fields.usuario || "",
     guardadoEn: ACTAS_FOLDER_NAME,
-    uploadedAt: new Date().toISOString()
+    uploadedAt: new Date().toISOString(),
   });
 
-  const created = await drive.files.create({
-    requestBody: {
-      name: fileName,
-      description,
-      parents: [folderId]
+  const uploaded = await callActasAppsScript({
+    action: "upload",
+    fileName: buildStoredFileName(file, fields),
+    mimeType: file.mimeType || "application/octet-stream",
+    base64: file.buffer.toString("base64"),
+    description,
+    meta: {
+      numero: fields.numero || "",
+      fecha: fields.fecha || "",
+      registro: fields.registro || "",
+      descripcion: fields.descripcion || "",
+      usuario: fields.usuario || "",
     },
-    media: {
-      mimeType: file.contentType || "application/octet-stream",
-      body: Readable.from(file.buffer)
-    },
-    fields: "id,name,mimeType,size,createdTime,modifiedTime,webViewLink,webContentLink,thumbnailLink,description",
-    supportsAllDrives: true
   });
 
-  return created.data;
+  return json(200, {
+    ok: true,
+    folderId: uploaded.folderId || "",
+    item: uploaded.item || uploaded,
+  });
 }
 
 exports.handler = async (event) => {
   try {
-    const method = event.httpMethod || "GET";
-    const drive = await getDrive();
-    const folderId = await ensureActasFolder(drive);
-
-    if (method === "GET") {
-      const items = await listActas(drive, folderId);
-      return json(200, { ok: true, folderId, folderName: ACTAS_FOLDER_NAME, items });
+    if (event.httpMethod === "OPTIONS") {
+      return withCors({ statusCode: 200, headers: {}, body: JSON.stringify({ ok: true }) });
     }
 
-    if (method === "POST") {
-      const { fields, files } = parseMultipart(event);
-      const file = files.find(f => f.fieldName === "file") || files[0];
-      const item = await uploadActa(drive, folderId, file, fields);
-      return json(200, { ok: true, folderId, item });
+    requireAuth(event);
+
+    if (event.httpMethod === "GET") {
+      const data = await callActasAppsScript({ action: "list" });
+      return withCors(json(200, {
+        ok: true,
+        folderId: data.folderId || "",
+        folderName: data.folderName || ACTAS_FOLDER_NAME,
+        items: data.items || [],
+      }));
     }
 
-    if (method === "DELETE") {
+    if (event.httpMethod === "POST") {
+      const contentType = getHeader(event, "content-type");
+      if (!contentType.toLowerCase().startsWith("multipart/form-data")) {
+        return withCors(json(400, { ok: false, error: "Solicitud inválida: se esperaba multipart/form-data." }));
+      }
+      return withCors(await uploadFromMultipart(event));
+    }
+
+    if (event.httpMethod === "DELETE") {
       const id = (event.queryStringParameters && event.queryStringParameters.id) || "";
-      if (!id) return json(400, { ok: false, error: "Falta id del archivo." });
-      await drive.files.update({
-        fileId: id,
-        requestBody: { trashed: true },
-        supportsAllDrives: true
-      });
-      return json(200, { ok: true });
+      if (!id) return withCors(json(400, { ok: false, error: "Falta id del archivo." }));
+      await callActasAppsScript({ action: "delete", fileId: id });
+      return withCors(json(200, { ok: true }));
     }
 
-    return json(405, { ok: false, error: "Método no permitido." });
+    return withCors(json(405, { ok: false, error: "Method not allowed" }));
   } catch (err) {
-    console.error("actas error", err);
-    return json(500, { ok: false, error: err.message || "Error interno en actas." });
+    const status = Number(err.statusCode || err.code || 500);
+    return withCors(json(status, { ok: false, error: err.message || String(err) }));
   }
 };
