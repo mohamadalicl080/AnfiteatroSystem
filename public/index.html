@@ -554,6 +554,12 @@
               <tbody id="actasBody" class="bg-white divide-y divide-gray-200"></tbody>
             </table>
           </div>
+
+          <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mt-4">
+            <p id="actasInfo" class="text-sm text-gray-600">Mostrando 0-0 de 0 actas</p>
+            <div id="actasPagination" class="flex flex-wrap gap-2"></div>
+          </div>
+
           <p class="text-xs text-gray-400 mt-3">Esta sección no reemplaza el libro físico ni la notaría; solo mantiene una copia digital de respaldo.</p>
         </div>
       </div>
@@ -2925,6 +2931,7 @@ function renderResumenMensual() {
     // Actas Administrativas
     // -----------------------------
     const ACTAS = { items: [], loadedAt: 0 };
+    const ACTAS_PAG = { pageSize: 5, page: 1, totalPages: 1, totalItems: 0 };
     const MAX_ACTA_BYTES = 20 * 1024 * 1024;
     const MAX_ACTA_UPLOAD_BYTES = 5 * 1024 * 1024; // límite seguro para Netlify + Apps Script
     const IMAGE_COMPRESS_TARGET_BYTES = 3.8 * 1024 * 1024;
@@ -3038,6 +3045,7 @@ function renderResumenMensual() {
       const data = await apiFetch("/.netlify/functions/actas");
       ACTAS.items = data.items || [];
       ACTAS.loadedAt = now;
+      if (force) ACTAS_PAG.page = 1;
       renderActas();
     }
 
@@ -3072,12 +3080,23 @@ function renderResumenMensual() {
       setText("actasCount", String(ACTAS.items?.length || 0));
       tbody.innerHTML = "";
 
+      ACTAS_PAG.totalItems = items.length;
+      ACTAS_PAG.totalPages = Math.max(1, Math.ceil(ACTAS_PAG.totalItems / ACTAS_PAG.pageSize));
+      if (ACTAS_PAG.page > ACTAS_PAG.totalPages) ACTAS_PAG.page = ACTAS_PAG.totalPages;
+      if (ACTAS_PAG.page < 1) ACTAS_PAG.page = 1;
+
+      const start = (ACTAS_PAG.page - 1) * ACTAS_PAG.pageSize;
+      const end = start + ACTAS_PAG.pageSize;
+      const pageItems = items.slice(start, end);
+
+      renderActasPagination(start, end);
+
       if (items.length === 0) {
         tbody.innerHTML = `<tr><td colspan="4" class="px-6 py-6 text-sm text-gray-500">No hay actas para mostrar.</td></tr>`;
         return;
       }
 
-      items.forEach(item => {
+      pageItems.forEach(item => {
         const meta = parseActaDescription(item.description);
         const created = item.createdTime ? new Date(item.createdTime).toLocaleString("es-CL") : "";
         const link = item.webViewLink || item.webContentLink || "";
@@ -3109,6 +3128,50 @@ function renderResumenMensual() {
         `;
         tbody.appendChild(tr);
       });
+    }
+
+    function renderActasPagination(start, end) {
+      const info = document.getElementById("actasInfo");
+      const pagination = document.getElementById("actasPagination");
+      if (info) {
+        const a = ACTAS_PAG.totalItems === 0 ? 0 : start + 1;
+        const b = Math.min(end, ACTAS_PAG.totalItems);
+        info.textContent = `Mostrando ${a}-${b} de ${ACTAS_PAG.totalItems} actas`;
+      }
+      if (!pagination) return;
+
+      pagination.innerHTML = "";
+
+      const makeBtn = (label, page, disabled = false, active = false) => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.textContent = label;
+        btn.disabled = disabled;
+        btn.className = active
+          ? "px-3 py-2 rounded-lg text-sm font-semibold bg-purple-600 text-white"
+          : "px-3 py-2 rounded-lg text-sm font-semibold border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed";
+        btn.addEventListener("click", () => {
+          if (disabled || page === ACTAS_PAG.page) return;
+          ACTAS_PAG.page = page;
+          renderActas();
+        });
+        return btn;
+      };
+
+      pagination.appendChild(makeBtn("Anterior", Math.max(1, ACTAS_PAG.page - 1), ACTAS_PAG.page <= 1));
+
+      const total = ACTAS_PAG.totalPages;
+      const current = ACTAS_PAG.page;
+      let pages = [];
+      if (total <= 5) {
+        pages = Array.from({ length: total }, (_, i) => i + 1);
+      } else {
+        const from = Math.max(1, Math.min(current - 2, total - 4));
+        pages = Array.from({ length: 5 }, (_, i) => from + i);
+      }
+
+      pages.forEach(page => pagination.appendChild(makeBtn(String(page), page, false, page === current)));
+      pagination.appendChild(makeBtn("Siguiente", Math.min(total, ACTAS_PAG.page + 1), ACTAS_PAG.page >= total));
     }
 
     async function uploadActasSelected(inputOverride = null) {
@@ -3158,6 +3221,7 @@ function renderResumenMensual() {
         const scanInput = document.getElementById("actasScanFile");
         if (scanInput) scanInput.value = "";
         ACTAS.loadedAt = 0;
+        ACTAS_PAG.page = 1;
         await loadActas({ force: true });
       } catch (e) {
         if (status) status.textContent = "";
@@ -3245,10 +3309,11 @@ function renderResumenMensual() {
         if (status) status.textContent = "";
       });
       document.getElementById("refreshActasBtn")?.addEventListener("click", () => loadActas({ force: true }).catch(err => alert("❌ Error cargando actas: " + (err.message || err))));
-      document.getElementById("actasSearch")?.addEventListener("input", renderActas);
-      document.getElementById("actasSort")?.addEventListener("change", renderActas);
-      document.getElementById("actasFechaDesde")?.addEventListener("change", renderActas);
-      document.getElementById("actasFechaHasta")?.addEventListener("change", renderActas);
+      const resetActasPageAndRender = () => { ACTAS_PAG.page = 1; renderActas(); };
+      document.getElementById("actasSearch")?.addEventListener("input", resetActasPageAndRender);
+      document.getElementById("actasSort")?.addEventListener("change", resetActasPageAndRender);
+      document.getElementById("actasFechaDesde")?.addEventListener("change", resetActasPageAndRender);
+      document.getElementById("actasFechaHasta")?.addEventListener("change", resetActasPageAndRender);
 
       // Campana (navbar): abre pestaña Alertas
       const bellBtn = document.getElementById("navBellBtn");
