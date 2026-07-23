@@ -155,6 +155,9 @@
         <button class="tabs-btn py-4 text-gray-600 hover:text-purple-600 whitespace-nowrap" data-tab="arriendos">
           <i class="fas fa-home mr-2"></i>Arriendos
         </button>
+        <button class="tabs-btn py-4 text-gray-600 hover:text-purple-600 whitespace-nowrap" data-tab="abonos">
+          <i class="fas fa-hand-holding-dollar mr-2"></i>Abonos
+        </button>
         <button class="tabs-btn py-4 text-gray-600 hover:text-purple-600 whitespace-nowrap" data-tab="proveedores">
           <i class="fas fa-tools mr-2"></i>Proveedores
         </button>
@@ -337,6 +340,32 @@
       <div class="flex justify-between items-center mt-6">
         <p id="arriendosInfo" class="text-sm text-gray-600">Mostrando 0-0 de 0 movimientos</p>
         <div id="arriendosPagination" class="flex space-x-2"></div>
+      </div>
+    </div>
+
+    <!-- Abonos -->
+    <div id="abonos-tab" class="hidden bg-white rounded-b-xl shadow-lg p-6">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-2xl font-bold text-gray-800"><i class="fas fa-hand-holding-dollar mr-2 text-purple-600"></i>Abonos</h2>
+        <div class="text-sm text-gray-600">Movimientos: <span id="abonosCount" class="font-semibold">0</span> · Total: <span id="abonosTotal" class="font-semibold">$0</span></div>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+          <thead class="bg-gray-100">
+            <tr><th class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Fecha</th>
+              <th class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Tipo</th>
+              <th class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Descripción</th>
+              <th class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Monto</th>
+              <th class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Responsable</th>
+              <th class="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="abonosBody" class="bg-white divide-y divide-gray-200"></tbody>
+        </table>
+      </div>
+      <div class="flex justify-between items-center mt-6">
+        <p id="abonosInfo" class="text-sm text-gray-600">Mostrando 0-0 de 0 movimientos</p>
+        <div id="abonosPagination" class="flex space-x-2"></div>
       </div>
     </div>
 
@@ -880,7 +909,7 @@
 
     // Tabs
     const TAB_IDS = [
-      "movimientos","gastos","arriendos","proveedores","empleados",
+      "movimientos","gastos","arriendos","abonos","proveedores","empleados",
       "caja-chica","otros","actas","alertas","resumen","actividad"
     ];
     let CURRENT_TAB = "movimientos";
@@ -1078,7 +1107,7 @@
       }
 
       // refresh dependent tabs
-      if (["gastos","arriendos","proveedores","empleados","caja-chica","otros"].includes(safeTab)) {
+      if (["gastos","arriendos","abonos","proveedores","empleados","caja-chica","otros"].includes(safeTab)) {
         renderAreaTabs();
       }
       if (safeTab === "actas") loadActas().catch(err => console.error("No pude cargar actas:", err));
@@ -1567,6 +1596,7 @@
     const AREA_PAG = {
       gastos: { pageSize: 5, page: 1, totalPages: 1 },
       arriendos: { pageSize: 5, page: 1, totalPages: 1 },
+      abonos: { pageSize: 5, page: 1, totalPages: 1 },
       proveedores: { pageSize: 5, page: 1, totalPages: 1 },
       empleados: { pageSize: 5, page: 1, totalPages: 1 },
       cajaChica: { pageSize: 5, page: 1, totalPages: 1 },
@@ -2567,6 +2597,18 @@
         rows: ar
       });
 
+      const ab = filterRowsByArea("Abonos");
+      const abTotal = calcCountAndTotal(ab);
+      setText("abonosCount", String(abTotal.count));
+      setText("abonosTotal", formatCLP(abTotal.total));
+      renderAreaWithPagination({
+        key: "abonos",
+        tbodyId: "abonosBody",
+        infoId: "abonosInfo",
+        paginationId: "abonosPagination",
+        rows: ab
+      });
+
       const pr = filterRowsByArea("Proveedores");
       const p = calcCountAndTotal(pr);
       setText("proveedoresCount", String(p.count));
@@ -3436,6 +3478,7 @@ function renderResumenMensual() {
 
 </body>
 </html>
+
 
 
 
