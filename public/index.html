@@ -45,10 +45,30 @@
     @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
     .tab-active { border-bottom: 3px solid #667eea; color: #667eea; font-weight: 600; }
     .modal-overlay { backdrop-filter: blur(4px); }
+
+    /* Indicador global de carga: evita dobles clics mientras se guarda/actualiza */
+    #globalLoadingOverlay { backdrop-filter: blur(2px); }
+    .loading-spinner {
+      width: 52px;
+      height: 52px;
+      border: 5px solid #e5e7eb;
+      border-top-color: #7c3aed;
+      border-radius: 9999px;
+      animation: loadingSpin 0.8s linear infinite;
+    }
+    @keyframes loadingSpin { to { transform: rotate(360deg); } }
   </style>
 </head>
 
 <body class="bg-gray-50">
+  <!-- Bloquea la interfaz durante operaciones que tardan, evitando registros duplicados -->
+  <div id="globalLoadingOverlay" class="hidden fixed inset-0 z-[9999] bg-black bg-opacity-45 flex items-center justify-center" aria-live="polite" aria-busy="true">
+    <div class="bg-white rounded-2xl shadow-2xl px-8 py-7 mx-4 text-center min-w-[260px]">
+      <div class="loading-spinner mx-auto"></div>
+      <p id="globalLoadingText" class="mt-4 text-lg font-bold text-gray-800">Cargando...</p>
+      <p class="mt-1 text-sm text-gray-500">Por favor, no cierres esta ventana ni vuelvas a presionar el botón.</p>
+    </div>
+  </div>
   <nav class="gradient-bg text-white shadow-lg">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="flex justify-between items-center h-16">
@@ -879,6 +899,44 @@
   <script>
     let currentUser = null;
     let authToken = localStorage.getItem("anf_token") || "";
+
+    // Estado global de operaciones: muestra "Cargando" y bloquea clics repetidos.
+    let GLOBAL_LOADING_COUNT = 0;
+    let MOVEMENT_SAVE_IN_PROGRESS = false;
+
+    function showGlobalLoading(message = "Cargando...") {
+      GLOBAL_LOADING_COUNT += 1;
+      const overlay = document.getElementById("globalLoadingOverlay");
+      const text = document.getElementById("globalLoadingText");
+      if (text) text.textContent = message;
+      overlay?.classList.remove("hidden");
+      document.body.style.overflow = "hidden";
+    }
+
+    function hideGlobalLoading() {
+      GLOBAL_LOADING_COUNT = Math.max(0, GLOBAL_LOADING_COUNT - 1);
+      if (GLOBAL_LOADING_COUNT > 0) return;
+      document.getElementById("globalLoadingOverlay")?.classList.add("hidden");
+      document.body.style.overflow = "";
+    }
+
+    function setMovementSubmitBusy(isBusy) {
+      const btn = document.getElementById("modalSubmitBtn");
+      const text = document.getElementById("modalSubmitText");
+      if (!btn) return;
+      btn.disabled = isBusy;
+      btn.classList.toggle("opacity-60", isBusy);
+      btn.classList.toggle("cursor-not-allowed", isBusy);
+      if (text) {
+        if (isBusy) {
+          text.dataset.previousText = text.textContent || "Guardar Movimiento";
+          text.textContent = "Guardando...";
+        } else {
+          text.textContent = text.dataset.previousText || (EDITING_ID ? "Guardar Cambios" : "Guardar Movimiento");
+          delete text.dataset.previousText;
+        }
+      }
+    }
 
     function getStoredUser() {
       try { return JSON.parse(localStorage.getItem("anf_user") || "null"); } catch { return null; }
@@ -2101,6 +2159,12 @@
 
     async function saveMovement(event) {
       event.preventDefault();
+      if (MOVEMENT_SAVE_IN_PROGRESS) return;
+
+      MOVEMENT_SAVE_IN_PROGRESS = true;
+      setMovementSubmitBusy(true);
+      showGlobalLoading(EDITING_ID ? "Actualizando movimiento..." : "Guardando movimiento...");
+
       try {
         const payload = readModalFields();
         const archivoUrl = await uploadComprobanteIfSelected(payload);
@@ -2153,6 +2217,10 @@
       } catch (err) {
         alert("❌ Error guardando: " + err.message);
         console.error(err);
+      } finally {
+        MOVEMENT_SAVE_IN_PROGRESS = false;
+        setMovementSubmitBusy(false);
+        hideGlobalLoading();
       }
     }
 
@@ -2963,6 +3031,7 @@ function renderResumenMensual() {
     async function deleteMovimientoById(id) {
       if (!id) return;
       if (!confirm(`¿Eliminar movimiento?\nID: ${id}`)) return;
+      showGlobalLoading("Eliminando movimiento...");
       try {
         await apiFetch(`/.netlify/functions/movimientos?id=${encodeURIComponent(id)}`, { method: "DELETE" });
         alert("✅ Eliminado: " + id);
@@ -2970,6 +3039,8 @@ function renderResumenMensual() {
         await loadMovimientos();
       } catch (e) {
         alert("❌ No pude eliminar: " + e.message);
+      } finally {
+        hideGlobalLoading();
       }
     }
 
@@ -3243,6 +3314,7 @@ function renderResumenMensual() {
 
       const btn = document.getElementById("uploadActasBtn");
       if (btn) btn.disabled = true;
+      showGlobalLoading("Guardando acta(s)...");
       try {
         for (let i = 0; i < files.length; i++) {
           const originalFile = files[i];
@@ -3275,18 +3347,22 @@ function renderResumenMensual() {
         alert("❌ Error subiendo actas: " + (e.message || e));
       } finally {
         if (btn) btn.disabled = false;
+        hideGlobalLoading();
       }
     }
 
     async function deleteActaById(id) {
       if (!id) return;
       if (!confirm("¿Eliminar esta copia digital de Google Drive?")) return;
+      showGlobalLoading("Eliminando acta...");
       try {
         await apiFetch(`/.netlify/functions/actas?id=${encodeURIComponent(id)}`, { method: "DELETE" });
         ACTAS.loadedAt = 0;
         await loadActas({ force: true });
       } catch (e) {
         alert("❌ Error eliminando acta: " + (e.message || e));
+      } finally {
+        hideGlobalLoading();
       }
     }
 
@@ -3478,6 +3554,8 @@ function renderResumenMensual() {
 
 </body>
 </html>
+
+
 
 
 
